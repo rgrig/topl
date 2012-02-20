@@ -9,4 +9,4 @@ echo "To: rusmus@dcs.qmul.ac.uk,ddino@eecs.qmul.ac.uk,radugrigore@gmail.com"
 echo -n "Subject: [safety] commit(s): "
 git diff $1..HEAD --shortstat -B -C -- .
 echo
-git log $1.. --pretty=format:"%an @ %ci%nhttp://github.com/rgrig/papers/commit/%h%n%w(80,2,2)%s%w()%n%n%w(80,2,2)%b" -- .
+git log $1.. --pretty=format:"%an @ %ci%nhttp://github.com/rgrig/topl/commit/%h%n%w(80,2,2)%s%w()%n%n%w(80,2,2)%b" -- .

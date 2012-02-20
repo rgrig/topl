@@ -625,19 +625,6 @@ let not_debug : BA.code_attribute -> bool = function
   | `LocalVariableTable _ -> false
   | _ -> true
 
-let remove_debug =
-  let rm_c c = { c with BA.attributes = List.filter not_debug c.BA.attributes } in
-  let rm_a : BA.for_method -> BA.for_method = function
-    | `Code c -> `Code (rm_c c)
-    | x -> x in
-  let rm_mr mr = { mr with BM.attributes      = List.map rm_a mr.BM.attributes } in
-  let rm_mc mc = { mc with BM.cstr_attributes = List.map rm_a mc.BM.cstr_attributes } in
-  let rm_mi mi = { mi with BM.init_attributes = List.map rm_a mi.BM.init_attributes } in
-  function
-    | BM.Regular mr     -> BM.Regular (rm_mr mr)
-    | BM.Constructor mc -> BM.Constructor (rm_mc mc)
-    | BM.Initializer mi -> BM.Initializer (rm_mi mi)
-
 let instrument_method get_tag h c = function
   | BM.Regular r as m -> begin
       (* printf "Found regular method %s\n" (B.Utils.UTF8.to_string (B.Name.utf8_for_method r.BM.name)); *)
@@ -650,7 +637,7 @@ let instrument_method get_tag h c = function
       let call_id = get_tag PA.Call overrides in
       let return_id = get_tag PA.Return overrides in
 	match call_id, return_id with
-	  | None, None -> remove_debug m
+	  | None, None -> m
 	  | _ -> begin
 	      let inst_code = instrument_code call_id return_id param_types return_types is_static in
 	      let inst_attrs = function
@@ -667,7 +654,7 @@ let instrument_method get_tag h c = function
 	      BM.Regular {r with BM.attributes = instrumented_attributes}
           end
     end
-  | m -> remove_debug m
+  | m -> m
 
 let pp_class f c =
     fprintf f "@[%s@]" (B.Utils.UTF8.to_string (B.Name.internal_utf8_for_class c.BC.name))

@@ -1,0 +1,11 @@
+<src>: include
+true: package(barista)
+true: package(menhirLib)
+true: package(str)
+true: package(unix)
+true: use_barista
+true: use_menhir
+<src/*.mly>: explain
+true: annot
+true: debug
+#true: profile # slow

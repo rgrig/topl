@@ -1,0 +1,154 @@
+% macros <<<
+\def\para #1.{\vskip0pt plus6pt\noindent{\it#1.\enspace}}
+\abovedisplayskip=6pt plus 3pt minus 3pt
+\abovedisplayshortskip=0pt plus 3pt
+\belowdisplayskip=6pt plus 3pt minus 3pt
+\belowdisplayshortskip=6pt plus 3pt minus 4pt
+
+% >>>
+This file contains notes written before the implementation of various tricky parts.
+Notes are in chronological order (oldest first) and there is no requirement for a note to relate to previous ones.
+This is mostly a historical document, so there is no promise that notes are kept up to date when the implementation changes.
+
+\beginsection Non-unit transitions (201106) % <<<
+
+The automata observe two types of events in the program, method calls and method returns.
+Sometimes, however, it is convenient for the user to think of a (call, return) pair as an atomic event.
+For example, a transition labeled $I:=C.{\it iterator}()$ refers to both the call and the return of the method {\it iterator}.
+The user can tag a transition with {\it call\/} or {\it return\/} to say which type of event may trigger it.
+If no tag is present then the transition is said to be a call--return transition.
+This note describes how to deal with such transitions that consume more than one event.
+
+Each call or return transition has a guard and an action:
+The guard examines the event and decides if the transition should be performed; the action writes to the automaton memory.
+$$x\to y:\; (g, a)  \eqno(1)$$
+Intuitively, a call--return transition has two guards and two actions.
+$$x\to y:\; (g_0,a_0); (g_1,a_1)  \eqno(2)$$
+In general, we could allow a list of (guard, action) pairs.
+$$x\to y: (g_0, a_0);\ldots;(g_{n-1},a_{n-1})  \eqno(3)$$
+{\it Unit transitions\/} are those with a list of length~$1$.
+Suppose the automaton is in state~$(x,\sigma_0)$, for some store~$\sigma_0$, and the stream of events is $e_0,e_1,e_2,\ldots$
+We say that an outgoing transition of~$x$ {\it matches\/} when $g_k\;e_k\;\sigma_k$ holds for all~$k\in[\,0.\,.\,n)$, where $\sigma_{k+1}=a_k\;e_k\;\sigma_k$.
+If none of the outgoing transitions of~$x$ match, then the automaton remains in the same state, $e_0$~is discarded, and the automaton continues to process the events $e_1,e_2,\ldots$
+Otherwise, one of the matching transitions is picked nondeterministically.
+The automaton {\it matches\/} the events $e_0,\ldots,e_{n-1}$ by going to the state~$(y,\sigma_n)$ and then continues to process the events $e_n,e_{n+1},\ldots$
+
+Consider an implementation that follows closely the previous description.
+Also consider an automaton with a single edge like~(3).
+Suppose the stream of events is very long and the transition always fails because of the last guard.
+We make a few observations.
+\smallskip
+\item- Each event will be examined $n$~times, once by each guard.
+\item- The last $n$~events coming from the stream must be kept in memory.
+\item- The state of the automaton lags behind the stream of events.
+\smallskip\noindent
+These observations suggest that the implementation is much simpler if it only handles the case~$n=1$.
+
+Is there a desugaring to equivalent unit automata?
+To illustrate the issues, let us try to desugar one call--return transition.
+$$x\to y:\; (g_0,a_0); (g_1,a_1)  \eqno(4)$$
+The first idea is to use two edges.
+$$\eqalign{
+  &x\to z:\; (g_0,a_0) \cr
+  &z\to y:\; (g_1,a_1)
+}\eqno(5)$$
+Suppose that initially the automata are in state~$(x,\sigma)$ and the stream of events $e_0,e_1,e_2$ satisfies the following.
+$$\eqalign{
+  &g_0\;e_0\;\sigma \cr
+  &\lnot(g_1\;e_1\;(a_0\;e_0\;\sigma)) \cr
+  &g_0\;e_1\;\sigma \cr
+  &g_1\;e_2\;(a_0\;e_1\;\sigma) \cr
+  &g_1\;e_2\;(a_0\;e_0\;\sigma)
+}\eqno(6)$$
+Automaton~$(4)$ discards $e_0$ and then matches $e_1,e_2$ by going to~$(y,a_1\;e_2\;(a_0\;e_1\;\sigma))$.
+But $(5)$~matches~$e_0$, discards~$e_1$, matches~$e_2$, and ends up in~$(y,a_1\;e_2\;(a_0\;e_0\;\sigma))$.
+
+We considered three ideas for desugaring:
+\smallskip
+\item- Do all the actions at the end and rewrite guards.
+\item- Use nondeterminism to keep around both the modified and the original store.
+\item- Enhance the semantics with {\it undo\/} actions and use them.
+\smallskip\noindent Let us consider them in turn.
+
+The basic skeleton for the desugaring based on guard rewriting is the following.
+$$\eqalign{
+  &x\to z:\; (g_0,0) \cr
+  &z\to y:\; (g'_1,a_0a_1)
+}\eqno(7)$$
+Here $g'_1$ is a guard derived from the information available in the initial automaton ($g_0$, $g_1$, $a_0$, $a_1$) and $a_0a_1$~is some composition of the actions.
+We want $g'_1\;e\;\sigma=g_1\;e\;(a_0\;e'\;\sigma)$ for all stores~$\sigma$ and all events $e$~and~$e'$.
+There is no such function, because only the right hand side depends on~$e'$.
+
+The basic skeleton for the desugaring based on exploiting nondeterminism is the following.
+$$\eqalign{
+  &x\to z:\; (g_0, a_0) \cr
+  &z\to y:\; (g_1, a_1) \cr
+  &x\to w:\; (g_0, 0) \cr
+  &w\to x:\; (\lnot g_1, 0)
+}\eqno(8)$$
+Here $0$~is a no-op and $\lnot g_1$ is a guard defined by $(\lnot g_1)\;e\;\sigma=\lnot(g_1\;e\;\sigma)$.
+The intuition is that vertex~$z$ represents partial success and vertex~$w$ represents partial failure.
+The transition~$w\to x$ is wrong because the guard~$g_1$ is evaluated on the original store.
+Suppose this issue could be fixed, although I don't know how.
+There is an even bigger problem.
+Consider the example~$(6)$.
+After $e_0$, the automaton nondeterministically proceeds to $z$~or~$w$.
+(We can imagine it is in both states.)
+After $e_1$, the automaton should be in state $(z,a_0\;e_1\;\sigma)$ and should leave vertex~$w$.
+This is because $g_1\;e_1\;(a_0\;e_0\;\sigma)$ does not hold and $g_0\;e_0\;\sigma$ does hold.
+However, we cannot design any transition that looks at two stores ($a_0\;e_0\;\sigma$ and~$\sigma$) at the same time.
+
+The basic skeleton for the desugaring based on allowing {\it undo\/} actions is the following.
+$$\eqalign{
+  &x\to z:\; (g_0,a_0) \cr
+  &z\to y:\; (g_1,a_1) \cr
+  &z\to x:\; (\lnot g_1,{\it undo}(1))
+}$$
+This, however, also suffers from the serious problem identified above.
+
+Let us take a step back and revisit the semantics.
+The earlier description can be recast as pseudo-code.
+$$\vbox{
+  \settabs\+\quad&\quad&\quad&\quad&\cr
+  \+    ${\it Process}(e)$\cr
+  \+&     ${\it state}:=({\it start},0)$\cr
+  \+&     {\bf while} $e$ is not empty\cr
+  \+&&      ${\it candidates}:=[]$\cr
+  \+$L:$&&  {\bf for each} transition ${\it vertex}({\it state})\to x:\;
+                               (g_0,a_0),\ldots,(g_{n-1},a_{n-1})$\cr
+  \+&&&       {\bf if} $n<{\it size}(e)$ {\bf then continue} loop $L$\cr
+  \+&&&       $\sigma:={\it store}(\it state)$\cr
+  \+&&&       {\bf for} $k\in[\,0.\,.\,n)$ \cr
+  \+&&&&        {\bf if} $\lnot(g_k\;e_k\;\sigma)$
+                      {\bf then continue} loop $L$\cr
+  \+&&&&        $\sigma:=a_k\;e_k\;\sigma$\cr
+  \+&&&     append $(x,\sigma,n)$ to {\it candidates}\cr
+  \+&&      {\bf if} no {\it candidates} \cr
+  \+&&&       delete $e_0$ from $e$\cr
+  \+&&      {\bf else}\cr
+  \+&&&       $(x,\sigma,n):=\hbox{random candidate}$\cr
+  \+&&&       delete $e_0,\ldots,e_{n-1}$ from $e$\cr
+  \+&&&       ${\it state}:=(x,\sigma)$\cr
+}$$
+A {\it state\/} consists of a vertex and a store.
+The pseudo-code above refers to the them as ${\it vertex}({\it state})$ and ${\it store}({\it state})$.
+I am tempted to begin with the simplest possible implementation:
+Use the hook in the program interpreter to build a big list~$e$ and then just implement the above.
+Still, it is useful to consider how a better implementation would work.
+Indeed, any desugaring (if there is one) corresponds to some implementation.
+
+The main drawback of the simplest implementation is its memory use.
+It saves all the events of one execution, but we know that at most two are needed at a time.
+(In general, $n$~are needed at a time, where $n$~is the length of the longest transition.
+But we only have unit transitions and call--return transitions.)
+There is an obvious solution to this problem.
+When we process one event $e_k$ we append it to $e$ and then execute the main loop of {\it Process\/} as long as we have enough events in~$e$.
+We have enough events in~$e$ when its length is $\ge$ the longest outgoing transition of the current vertex.
+When the interpreted program finishes $e$~might not be empty, so we need to run the main loop of {\it Process\/} to exhaust it.
+(The $\min$ in the innermost loop is useful only for this last processing.)
+
+% >>>
+
+\bye
+
+% vim:wrap:linebreak:fmr=<<<,>>>:nosi:spell:

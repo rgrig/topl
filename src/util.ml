@@ -35,6 +35,14 @@ let unique l =
   List.iter (fun x -> Hashtbl.replace h x x) l;
   Hashtbl.fold (fun _ -> cons) h []
 
+let fold_with_index f init xs =
+  let g (i, acc) x = succ i, f acc i x in
+  snd (List.fold_left g (0, init) xs)
+
+let map_with_index f xs =
+  let g acc i x = f i x :: acc in
+  List.rev (fold_with_index g [] xs)
+
 (** Operators go in a submodule so that we can open it, without having to
 polute the namespace with everything in Util. *)
 module Operators = struct

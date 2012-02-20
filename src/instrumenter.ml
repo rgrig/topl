@@ -371,13 +371,6 @@ end
 
 (* }}} *)
 
-let string_of_method_name mn =
-  B.Utils.UTF8.to_string (B.Name.utf8_for_method mn)
-
-let mk_method mn ma =
-  { method_name = string_of_method_name mn
-  ; method_arity = ma }
-
 let utf8 = B.Utils.UTF8.of_string
 let utf8_for_class x = B.Name.make_for_class_from_external (utf8 x)
 let utf8_for_field x = B.Name.make_for_field (utf8 x)
@@ -395,6 +388,38 @@ let property = utf8_for_class "topl.Property"
 let property_checker = utf8_for_field "checker"
 let checker = utf8_for_class "topl.Checker"
 let check = utf8_for_method "check"
+
+(* helpers for handling bytecode of methods *) (* {{{ *)
+let bm_parameters c = function
+  | BM.Regular m ->
+      (if List.mem `Static m.BM.flags then [] else [`Class c])
+      @ fst m.BM.descriptor
+  | BM.Constructor m -> `Class c :: m.BM.cstr_descriptor
+  | BM.Initializer _ -> []
+
+let bm_return = function
+  | BM.Regular r -> snd r.BM.descriptor
+  | BM.Constructor _ | BM.Initializer _ -> `Void
+
+let bm_name = function
+  | BM.Regular r -> B.Utils.UTF8.to_string (B.Name.utf8_for_method r.BM.name)
+  | BM.Constructor _ -> "<init>"
+  | BM.Initializer _ -> "<clinit>"
+
+let bm_map_attributes f = function
+  | BM.Regular r -> BM.Regular { r with BM.attributes = f r.BM.attributes }
+  | BM.Constructor c ->
+      BM.Constructor { c with BM.cstr_attributes = f c.BM.cstr_attributes }
+  | BM.Initializer i ->
+      BM.Initializer { i with BM.init_attributes = f i.BM.init_attributes }
+
+(* }}} *)
+let mk_method m =
+  let method_name = bm_name m in
+  let dummy_name = utf8_for_class "DummyClassSBW6" in
+    (* The string at the end of [dummy_name] is random. You can search by it. *)
+  let method_arity = List.length (bm_parameters dummy_name m) in
+  { method_name; method_arity }
 
 (* bytecode generating helpers *) (* {{{ *)
 let bc_print_utf8 us = [
@@ -518,15 +543,9 @@ let get_tag x =
           Some !cnt
   end else None
 
-let bc_send_event id param_types is_static =
-  (* this is ugly, it should just receive the arity *)
-  let dummy = checker in
-  let params = if is_static then param_types else (`Class dummy)::param_types in
-  let fold (instructions, i) t =
-    bc_array_set i t :: instructions, succ i in
-  let (inst_lists, _) = List.fold_left fold ([], 0) params in
-  let instructions = List.flatten (List.rev inst_lists) in
-    (bc_new_object_array (List.length params)) @
+let bc_send_event id param_types =
+  let instructions = List.flatten (U.map_with_index bc_array_set param_types) in
+    (bc_new_object_array (List.length param_types)) @
     instructions @
     (bc_new_event id) @
     bc_check
@@ -583,10 +602,10 @@ let rec add_return_code return_code = function
   (* do not instrument RET or WIDERET *)
   | x :: xs -> x :: (add_return_code return_code xs)
 
-let instrument_code call_id return_id param_types return_types is_static code =
+let instrument_code call_id return_id param_types return_types code =
   let bc_send_call_event = match call_id with
     | None -> []
-    | Some id -> bc_send_event id param_types is_static in
+    | Some id -> bc_send_event id param_types in
   let bc_send_ret_event = match return_id with
     | None -> []
     | Some id -> bc_send_return_event id return_types in
@@ -597,15 +616,9 @@ let instrument_code call_id return_id param_types return_types is_static code =
   put_labels_on bc_send_call_event @
   (add_return_code bc_send_ret_event code)
 
-let has_static_flag flags =
-  let is_static_flag = function
-    | `Static -> true
-    | _ -> false in
-  List.exists is_static_flag flags
-
 let rec get_ancestors h m c =
   try
-    let (ms, parents) = Hashtbl.find h c in
+    let ms, parents = Hashtbl.find h c in
     let here = if List.mem m ms then [c] else [] in
     here @ (parents >>= get_ancestors h m)
   with Not_found -> []
@@ -620,41 +633,19 @@ let get_overrides h c ({method_name=n; method_arity=a} as m) =
 let raise_stack n x =
   B.Utils.u2 ((x : B.Utils.u2 :> int) + n)
 
-let not_debug : BA.code_attribute -> bool = function
-  | `LineNumberTable _
-  | `LocalVariableTable _ -> false
-  | _ -> true
-
-let instrument_method get_tag h c = function
-  | BM.Regular r as m -> begin
-      (* printf "Found regular method %s\n" (B.Utils.UTF8.to_string (B.Name.utf8_for_method r.BM.name)); *)
-      let param_types, return_types = r.BM.descriptor in
-      let is_static = has_static_flag r.BM.flags in
-      let nr_params = List.length param_types + if is_static then 0 else 1 in
-      let overrides =
-        get_overrides h c (mk_method r.BM.name nr_params) in
-      (* printf "  number of overrides: %d\n" (List.length (fst overrides)); *)
-      let call_id = get_tag PA.Call overrides in
-      let return_id = get_tag PA.Return overrides in
-	match call_id, return_id with
-	  | None, None -> m
-	  | _ -> begin
-	      let inst_code = instrument_code call_id return_id param_types return_types is_static in
-	      let inst_attrs = function
-		| `Code code ->
-		    let new_instructions = inst_code code.BA.code in
-                    let new_attributes = List.filter not_debug code.BA.attributes in
-		    let instrumented_code =
-		      { code with
-                        BA.code = new_instructions
-                      ; BA.attributes = new_attributes } in
-		    `Code instrumented_code
-		| a -> a in
-	      let instrumented_attributes = List.map inst_attrs r.BM.attributes in
-	      BM.Regular {r with BM.attributes = instrumented_attributes}
-          end
-    end
-  | m -> m
+let instrument_method get_tag h c m =
+  let overrides = get_overrides h c (mk_method m) in
+  let ic = instrument_code
+    (get_tag PA.Call overrides)
+    (get_tag PA.Return overrides)
+    (bm_parameters c m)
+    (bm_return m) in
+  let ia xs =
+    let f = function
+      | `Code c -> `Code { c with BA.code = ic c.BA.code }
+      | a -> a in
+    List.map f xs in
+  bm_map_attributes ia m
 
 let pp_class f c =
     fprintf f "@[%s@]" (B.Utils.UTF8.to_string (B.Name.internal_utf8_for_class c.BC.name))
@@ -669,17 +660,10 @@ let compute_inheritance in_dir =
   let h = Hashtbl.create 101 in
   let record_class c =
     let name = c.BC.name in
-    let fold mns = function
-      | BM.Regular r ->
-	  let is_static = has_static_flag r.BM.flags in
-	  let (ps, _) = r.BM.descriptor in (* return is not used *)
-	  let nr_params = List.length ps + if is_static then 0 else 1 in
-          mk_method r.BM.name nr_params :: mns
-      | _ -> mns in
-    let method_names = List.fold_left fold [] c.BC.methods in
+    let method_names = List.map mk_method c.BC.methods in
     let parents = match c.BC.extends with
       | None -> c.BC.implements
-      | Some e -> e::c.BC.implements in
+      | Some e -> e :: c.BC.implements in
     Hashtbl.replace h name (method_names, parents)
   in
     ClassMapper.iter in_dir record_class;

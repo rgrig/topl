@@ -63,22 +63,18 @@
       ; PA.method_arity = None }
     ; PA.value_guards = [] }
 
-  let fold_with_index f init xs =
-    let g (i, acc) x = succ i, f acc i x in
-    snd (List.fold_left g (0, init) xs)
-
   let mk_value_guards =
     let f acc i = function
       | GuardVar x -> PA.Variable (x, i) :: acc
       | GuardCt v -> PA.Constant (v, i) :: acc
       | _ -> acc in
-    fold_with_index f []
+    Util.fold_with_index f []
 
   let mk_action =
     let f acc i = function
       | Action v -> (v, i) :: acc
       | _ -> acc in
-    fold_with_index f []
+    Util.fold_with_index f []
 
   let mk_label g t vs =
     let g =

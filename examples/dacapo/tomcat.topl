@@ -1,0 +1,24 @@
+property ForwardOnlyUncommittedResponses
+  // TODO assume ResponseUsesEitherWriterOrStream
+  observe <javax.servlet.{ServletOutputStream,ServletResponse}.*>
+  observe <java.io.PrintWriter.flush>
+  prefix <javax.servlet>
+  prefix <javax.servlet.{ServletOutputStream,ServletResponse}>
+  prefix <java.io.PrintWriter>
+  start -> start: *
+  start -> tracking: R := *.<ServletResponse.\<init\>>[*] // TODO: no *.
+  tracking -> ok: r.flushBuffer()
+  tracking -> gotWriter: W := r.getWriter()
+  gotWriter -> ok: w.flush(), r.flushBuffer()
+  tracking -> gotStream: S := r.getOutputStream()
+  gotStream -> ok: s.flush(), r.flushBuffer()
+  tracking -> error: call *.<RequestDispatcher.forward>(*, r)
+
+property ResponseUsesEitherWriterOrStream
+  observe <javax.ServletResponse.{getOutputStream,getWriter}>
+  prefix <javax.ServletResponse>
+  start -> start: *
+  start -> gotWriter: R.getWriter()
+  start -> gotStream: R.getOutputStream()
+  gotWriter -> error: call r.getOutputStream()
+  gotStream -> error: call r.getWriter()

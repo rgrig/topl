@@ -133,8 +133,9 @@ let rec iter in_dir f =
     | None -> ()
     | Some (cd, _) -> f cd in
   let process _ fn =
-    printf "@[iterating %s@." (in_dir / fn);
-    if Sys.is_directory (in_dir / fn) then printf "@[directory@."
+    if log_cm then  printf "@[iterating %s@." (in_dir / fn);
+    if Sys.is_directory (in_dir / fn)
+    then (if log_cm then printf "@[directory@.")
     else if is_jar fn then iter_jar fn
     else if is_class fn then iter_class fn in
   U.rel_fs_preorder in_dir process ""

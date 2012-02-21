@@ -1,3 +1,6 @@
+/*.native
+/.vimrc
+/TODO
 /_build
 /mail.tmp
 /setenv

@@ -16,11 +16,11 @@ main
   var Collection c := new
   var Iterator it := c.iterator()
   var Bool hasNext
-  do { hasNext := it.hasNext() } 
+  do { hasNext := it.hasNext() }
   while (hasNext && *)
     var Object o := it.next()
     var Iterator it2 := c.iterator()
-    do { hasNext:=it2.hasNext() } 
+    do { hasNext:=it2.hasNext() }
     while (hasNext)
       var Object o2 := it2.next()
   hasNext := it.hasNext()

@@ -1,6 +1,6 @@
 # Configuration
 OCFLAGS=-w,Ae
-MAINS=instrumenter
+MAINS=toplc
 
 # Things that should seldom change
 BYTES=$(addsuffix .byte,$(MAINS))

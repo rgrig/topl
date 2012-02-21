@@ -695,7 +695,6 @@ let () =
 
 (* }}} *)
 (* TODO:
-  - Instrument constructors.
   - Make the command "toplc <dir> <properties>" just work.
   - Don't forget that methods in package "topl" should not be instrumented.
   - a way to select properties (by name) from the command line
@@ -710,6 +709,3 @@ let () =
     selected (whenever one selects the assuming property by its names). Second,
     we should check that there are no cycles.
  *)
-(*
-vim:sts=2:sw=2:ts=8:et:
-*)

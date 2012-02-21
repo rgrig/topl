@@ -30,7 +30,7 @@
       ; "main", MAIN
       ; "message", MESSAGE
       ; "new", NEW
-      ; "observing", OBSERVING
+      ; "observe", OBSERVE
       ; "or", OR
       ; "prefix", PREFIX
       ; "property", PROPERTY

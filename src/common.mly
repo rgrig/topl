@@ -35,7 +35,7 @@
 %token NE
 %token NEW
 %token NOT
-%token OBSERVING
+%token OBSERVE
 %token OR
 %token PREFIX
 %token PROPERTY

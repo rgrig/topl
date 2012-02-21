@@ -9,7 +9,7 @@
 
   type item =
     | I_message of string
-    | I_observing of string
+    | I_observe of string
     | I_prefix of string
     | I_transitions of (string, variable, value) PA.transition list
 
@@ -90,7 +90,7 @@
 
   let split_items xs =
     U.map_option (function I_message x -> Some x | _ -> None) xs,
-    U.map_option (function I_observing x -> Some x | _ -> None) xs,
+    U.map_option (function I_observe x -> Some x | _ -> None) xs,
     U.map_option (function I_prefix x -> Some x | _ -> None) xs,
     U.map_option (function I_transitions x -> Some x | _ -> None) xs
 
@@ -134,13 +134,13 @@
 
 item:
     i=message
-  | i=observing
+  | i=observe
   | i=prefix
   | i=transition
   { i }
 
-observing:
-    OBSERVING p=string_pattern { I_observing p }
+observe:
+    OBSERVE p=string_pattern { I_observe p }
 
 prefix: PREFIX p=string_pattern { I_prefix p }
 

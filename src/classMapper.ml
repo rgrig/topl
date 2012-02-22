@@ -13,12 +13,6 @@ let (/) d f =
 let is_jar f = F.check_suffix f ".jar"
 let is_class f = F.check_suffix f ".class"
 
-let mk_tmp_dir p s =
-  let tmp_file = F.temp_file p s in
-  Sys.remove tmp_file;
-  U.mkdir_p tmp_file;
-  tmp_file
-
 let ensure_dir f =
   if F.check_suffix f "/" then f else (f ^ "/")
 
@@ -71,8 +65,8 @@ let output_class version fn c =
 let rec map in_dir out_dir f =
   let process_jar jf =
     if log_cm then printf "@\n@[map jar: %s@]" (in_dir / jf);
-    let tmp_in_dir = mk_tmp_dir "in_" "_jar" in
-    let tmp_out_dir = mk_tmp_dir "out_" "_jar" in
+    let tmp_in_dir = U.mk_tmp_dir "in_" "_jar" in
+    let tmp_out_dir = U.mk_tmp_dir "out_" "_jar" in
     let jar_in = Zip.open_in (in_dir / jf) in
     let extract e =
       let e_fn = tmp_in_dir / e.Zip.filename in
@@ -117,7 +111,7 @@ let rec map in_dir out_dir f =
 let rec iter in_dir f =
   let iter_jar jf =
     if log_cm then printf "@[iter jar: %s@]" jf;
-    let tmp_in_dir = mk_tmp_dir "iter_" "_jar" in
+    let tmp_in_dir = U.mk_tmp_dir "iter_" "_jar" in
     let jar_in = Zip.open_in (in_dir / jf) in
     let extract e =
       let e_fn = tmp_in_dir / e.Zip.filename in

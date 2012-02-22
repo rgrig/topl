@@ -15,6 +15,10 @@ let from_some = function
   | Some x -> x
   | None -> failwith "I was hoping to get Some."
 
+let list_of_option = function
+  | Some x -> [x]
+  | None -> []
+
 (* [map_find d f p xs] applies [f] to each [x] and returns the first
   result that satisfies [p]. Otherwise returns the default [d]. *)
 let rec map_find d f p = function
@@ -72,18 +76,18 @@ let add_ints s = List.fold_left (flip IntSet.add) s
 
 let add_strings s = List.fold_left (flip StringSet.add) s
 
-let pp_s pp_f s = Format.fprintf pp_f "%s" s
+let pp_s pp_f s = fprintf pp_f "%s" s
 
 let pp_list pp_sep pp_element =
   let rec f = fun pp_f -> function
     | [] -> ()
     | [x] -> pp_element pp_f x
-    | x :: xs -> Format.fprintf pp_f "@[%a@]%s@,%a" pp_element x pp_sep f xs in
+    | x :: xs -> fprintf pp_f "@[%a@]%s@,%a" pp_element x pp_sep f xs in
   f
 
 let pp_option pp_e ppf = function
-  | None -> Format.fprintf ppf "None"
-  | Some s -> Format.fprintf ppf "Some %a" pp_e s
+  | None -> fprintf ppf "None"
+  | Some s -> fprintf ppf "Some %a" pp_e s
 
 let rec fix f x =
   let y = f x in
@@ -122,10 +126,7 @@ let fresh_internal_id =
 
 let todo () = failwith "todo"
 
-let list_of_option = function
-  | Some x -> [x]
-  | None -> []
-
+(* TODO(rgrig): Remove if unused. *)
 let cartesian xss =
   let rec f acc = function
     | [] -> List.map List.rev acc
@@ -184,13 +185,62 @@ let rec mkdir_p dir =
       Unix.mkdir dir 0o755
   end
 
+(* TODO(rgrig): CONTINUE HERE. *)
+let cp_r source_file target_directory =
+  let cp top path =
+    let (/) = Filename.concat in
+    let src = top/path in
+    let tgt = target_directory/path in
+    if Sys.is_directory src
+    then mkdir_p tgt
+    else cp src tgt in
+  cp source_file "";
+  if Sys.is_directory source_file then rel_fs_preorder source_file cp ""
+
+let mk_tmp_dir p s =
+  let tmp_file = Filename.temp_file p s in
+  Sys.remove tmp_file;
+  mkdir_p tmp_file;
+  tmp_file
+
+(* TODO(rgrig): Do this properly. *)
+let command_escape s =
+  "\"" ^ s ^ "\""
+
+(* It is *unlikely* that the returned name is of an existing file. *)
+let rec temp_path prefix =
+  Filename.concat
+    (Filename.temp_dir_name)
+    (Printf.sprintf "%s%Lx"
+      prefix
+      (Int64.of_float (1000.0 *. Unix.gettimeofday ())))
+
 let open_out_p fn =
   mkdir_p (Filename.dirname fn);
   open_out fn
 
-(* TODO:
-  - nothing for now?
- *)
-(*
-vim:sts=2:sw=2:ts=8:et:
-*)
+(* Throws [Not_found] if [p] isn't a valid absolute path. *)
+(* TODO(rgrig): test on Windows and cygwin. *)
+let normalize_path p =
+  let rec components acc d =
+    let dn, bn = (Filename.dirname d, Filename.basename d) in
+    if dn = d
+    then dn :: acc
+    else components (bn :: acc) dn in
+  let rec clean n acc = function
+    | [r] -> if n <> 0 then raise Not_found else r :: acc
+    | d :: ds when d = Filename.current_dir_name -> clean n acc ds
+    | d :: ds when d = Filename.parent_dir_name -> clean (succ n) acc ds
+    | d :: ds ->
+        if n = 0
+        then clean n (d :: acc) ds
+        else clean (pred n) acc ds
+    | [] -> raise Not_found in
+  match clean 0 [] (List.rev (components [] p)) with
+    | d :: ds -> List.fold_left Filename.concat d ds
+    | [] -> failwith "INTERNAL: Should have raised Not_found already"
+
+let is_prefix s t =
+  let m, n = (String.length s, String.length t) in
+  let rec f i j = i = m || (j < n && s.[i] = t.[j] && f (succ i) (succ j)) in
+  f 0 0

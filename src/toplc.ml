@@ -269,8 +269,12 @@ let pq_constants j constants =
   fprintf j "@]@\n}@]"
 
 let generate_checkers out_dir p =
+  let (/) = Filename.concat in
+  U.cp_r (Config.src_dir/"topl") out_dir;
+  let out_dir = out_dir/"topl" in
+  U.mkdir_p out_dir;
   let o n =
-    let c = open_out (Filename.concat out_dir ("Property." ^ n)) in
+    let c = open_out (out_dir/("Property." ^ n)) in
     let f = formatter_of_out_channel c in
     (c, f) in
   let (jc, j), (tc, t) = o "java", o "text" in
@@ -278,7 +282,12 @@ let generate_checkers out_dir p =
   let coi = inverse_index (fun x -> x) ioc in
   pq_constants j coi;
   pq_automaton ioc t p;
-  List.iter close_out_noerr [jc; tc]
+  List.iter close_out_noerr [jc; tc];
+  ignore (Sys.command
+    (Printf.sprintf
+      "javac -sourcepath %s %s"
+      (U.command_escape out_dir)
+      (U.command_escape (out_dir/"*.java"))))
 
 (* }}} *)
 (* conversion to Java representation *) (* {{{ *)
@@ -676,22 +685,49 @@ let read_properties fs =
   let e p = List.map (fun x -> x.PA.ast) p.SA.program_properties in
   fs >> List.map Helper.parse >>= e
 
+exception Bad_arguments of string
+
+let check_work_directory d =
+  let e = Bad_arguments ("Bad work directory: " ^ d) in
+  try
+    let here = Unix.getcwd () in
+    let dir = Filename.concat here d in
+    let here, dir = (U.normalize_path here, U.normalize_path dir) in
+    if U.is_prefix dir here then raise e
+  with Not_found -> raise e
+
 let () =
+  let usage = Printf.sprintf
+    "usage: %s -i <dir> [-o <dir>] <topls>" Sys.argv.(0) in
   try
     let fs = ref [] in
-    let in_dir = ref Filename.current_dir_name in
-    let out_dir = ref (Filename.concat Filename.temp_dir_name "out") in
-    Arg.parse ["-i", Arg.Set_string in_dir, "input directory";
-               "-o", Arg.Set_string out_dir, "output directory"]
-              (fun x -> fs := x :: !fs)
-               "usage: ./instrumenter [-i <input directory>] [-o <output directory>] <property_files>";
+    let in_dir = ref None in
+    let out_dir = ref None in
+    let set_dir r v = match !r with
+      | Some _ -> raise (Bad_arguments "Repeated argument.")
+      | None -> r := Some v in
+    Arg.parse
+      [ "-i", Arg.String (set_dir in_dir), "input directory"
+      ; "-o", Arg.String (set_dir out_dir), "output directory" ]
+      (fun x -> fs := x :: !fs)
+      usage;
+    if !in_dir = None then raise (Bad_arguments "Missing input directory.");
+    if !out_dir = None then out_dir := !in_dir;
+    let in_dir, out_dir = U.from_some !in_dir, U.from_some !out_dir in
+    let tmp_dir = U.temp_path "toplc_" in
+    List.iter check_work_directory [in_dir; out_dir; tmp_dir];
     let ps = read_properties !fs in
-    let h = compute_inheritance !in_dir in
+    let h = compute_inheritance in_dir in
     let p = transform_properties ps in
-    ClassMapper.map !in_dir !out_dir (instrument_class (get_tag p) h);
-    generate_checkers !out_dir p
+    ClassMapper.map in_dir tmp_dir (instrument_class (get_tag p) h);
+    generate_checkers tmp_dir p;
+(*     U.rm_r out_dir; *)
+(*     Sys.rename tmp_dir out_dir *)
   with
-    | Helper.Parsing_failed m -> eprintf "@[%s@." m
+    | Bad_arguments m
+    | Helper.Parsing_failed m
+(*     | Sys_error m *)
+        -> eprintf "@[ERROR: %s@." m
 
 (* }}} *)
 (* TODO:

@@ -9,11 +9,16 @@ OCAMLBUILD=ocamlbuild -use-ocamlfind -cflags $(OCFLAGS)
 
 default: native
 
-byte:
+byte: src/config.ml
 	@$(OCAMLBUILD) $(BYTES)
+	ln -sf toplc.byte toplc
 
-native:
+native: src/config.ml
 	@$(OCAMLBUILD) $(NATIVES)
+	ln -sf toplc.native toplc
+
+src/config.ml:
+	echo "let src_dir = \"$(CURDIR)/src\"" > src/config.ml
 
 checker:
 	@mkdir -p classes
@@ -21,7 +26,7 @@ checker:
 
 clean:
 	@$(OCAMLBUILD) -clean
-	@rm -f .out
 	@rm -rf classes
+	@rm -f toplc src/config.ml
 
 .PHONY: byte checker clean default native

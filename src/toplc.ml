@@ -266,15 +266,16 @@ let pq_constants j constants =
   fprintf j   "new Object[]{%a@]};" (pp_v_list pp_string) constants;
   fprintf j "@\n@[<2>public static final Checker checker =@ ";
   fprintf j   "Checker.Parser.checker(\"topl\" + java.io.File.separator + \"Property.text\",@ constants);@]";
+  fprintf j "@\n@[static { checker.activate(); } @]";
   fprintf j "@]@\n}@]"
 
 let generate_checkers out_dir p =
   let (/) = Filename.concat in
   U.cp_r (Config.src_dir/"topl") out_dir;
-  let out_dir = out_dir/"topl" in
-  U.mkdir_p out_dir;
+  let topl_dir = out_dir/"topl" in
+  U.mkdir_p topl_dir;
   let o n =
-    let c = open_out (out_dir/("Property." ^ n)) in
+    let c = open_out (topl_dir/("Property." ^ n)) in
     let f = formatter_of_out_channel c in
     (c, f) in
   let (jc, j), (tc, t) = o "java", o "text" in
@@ -287,7 +288,7 @@ let generate_checkers out_dir p =
     (Printf.sprintf
       "javac -sourcepath %s %s"
       (U.command_escape out_dir)
-      (U.command_escape (out_dir/"*.java"))))
+      (U.command_escape (topl_dir/"Property.java"))))
 
 (* }}} *)
 (* conversion to Java representation *) (* {{{ *)
@@ -721,8 +722,8 @@ let () =
     let p = transform_properties ps in
     ClassMapper.map in_dir tmp_dir (instrument_class (get_tag p) h);
     generate_checkers tmp_dir p;
-(*     U.rm_r out_dir; *)
-(*     Sys.rename tmp_dir out_dir *)
+    U.rm_r out_dir;
+    U.rename tmp_dir out_dir
   with
     | Bad_arguments m
     | Helper.Parsing_failed m

@@ -185,7 +185,6 @@ let rec mkdir_p dir =
       Unix.mkdir dir 0o755
   end
 
-(* TODO(rgrig): CONTINUE HERE. *)
 let cp_r source_file target_directory =
   let cp top path =
     let (/) = Filename.concat in
@@ -194,8 +193,17 @@ let cp_r source_file target_directory =
     if Sys.is_directory src
     then mkdir_p tgt
     else cp src tgt in
-  cp source_file "";
-  if Sys.is_directory source_file then rel_fs_preorder source_file cp ""
+  let top, sf = (Filename.dirname source_file, Filename.basename source_file) in
+  cp top sf;
+  if Sys.is_directory source_file then rel_fs_preorder top cp sf
+
+let rename s t =
+  assert (Sys.file_exists s && not (Sys.file_exists t));
+  try Sys.rename s t
+  with Sys_error _ ->
+    let dt = Filename.dirname t in
+    cp_r s dt;
+    Sys.rename (Filename.concat dt (Filename.basename s)) t
 
 let mk_tmp_dir p s =
   let tmp_file = Filename.temp_file p s in

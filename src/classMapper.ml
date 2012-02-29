@@ -44,23 +44,23 @@ let open_class fn =
     | Sys_error msg -> eprintf "@[error opening %s: %s@." fn msg; None
 
 let output_class version fn c =
+  let ch = open_out fn in
+  let re m =
+    close_out_noerr ch;
+    eprintf "@[enc %s: %s@]@\n" fn m;
+    false in
   try
-    let ch = open_out fn in
     let bytes = B.HighClass.encode (c, version) in
     B.ClassFile.write bytes (B.OutputStream.make_of_channel ch);
     close_out ch;
     true
   with
-    | Sys_error msg -> eprintf "@[error opening %s: %s@." fn msg; false
-    | B.Version.Exception e ->
-        eprintf "@[enc %s: %s@." fn (B.Version.string_of_error e); false
-    | B.Name.Exception e ->
-        eprintf "@[enc %s: %s@." fn (B.Name.string_of_error e); false
-    | B.AccessFlag.Exception e ->
-        eprintf "@[enc %s: %s@." fn (B.AccessFlag.string_of_error e); false
-    | B.HighClass.Exception e ->
-        eprintf "@[enc %s: %s@." fn (B.HighClass.string_of_error e); false
-    | _ -> eprintf "@[enc %s: error@." fn; false
+    | B.Version.Exception e -> re (B.Version.string_of_error e)
+    | B.Name.Exception e -> re (B.Name.string_of_error e)
+    | B.AccessFlag.Exception e -> re (B.AccessFlag.string_of_error e)
+    | B.HighClass.Exception e -> re (B.HighClass.string_of_error e)
+    | Sys_error m -> re ("syserror: " ^ m)
+    | _ -> re "unknown"
 
 let rec map in_dir out_dir f =
   let process_jar jf =

@@ -11,7 +11,9 @@ let parse fn =
   try
     let parse =
       MenhirLib.Convert.Simplified.traditional2revised Parser.program in
-    parse (Lexer.token lexbuf)
+    let r = parse (Lexer.token lexbuf) in
+    close_in_noerr f;
+    r
   with Parser.Error ->
     (match Lexing.lexeme_start_p lexbuf with
     { Lexing.pos_lnum=line; Lexing.pos_bol=c0;

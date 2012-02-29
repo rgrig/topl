@@ -355,32 +355,6 @@ let transform_properties ps =
 (* }}} *)
 (* bytecode instrumentation *) (* {{{ *)
 
-(* InstrumentationMap *) (* {{{ *)
-(* TODO(rgrig): Does the new Barista make this unnecessary? *)
-module InstrumentationMap : sig
-  type t
-  val insert : t -> int -> BI.t list -> t
-  val apply : t -> BI.t list -> BI.t list
-  val size : t -> int -> int -> int
-end
-= struct
-  type t = (int * int * BI.t list) list
-  let code_size _ = failwith "todo"
-  let insert t pos code = (pos, code_size code, code) :: t
-  let size t a b =
-    let f acc (pos, sz, _) = acc + (if a <= pos && pos < b then sz else 0) in
-    List.fold_left f 0 t
-  let apply t code =
-    let cnt = ref (-1) in
-    let code = List.sort compare (List.concat (
-      (List.map (fun x -> incr cnt; (!cnt, 0, x)) code) ::
-      (List.map (fun (i, _, xs) ->
-        cnt := 0; List.map (fun x -> incr cnt; (i, !cnt, x)) xs) t))) in
-    List.map (fun (_, _, x) -> x) code
-end
-
-(* }}} *)
-
 let utf8 = B.Utils.UTF8.of_string
 let utf8_for_class x = B.Name.make_for_class_from_external (utf8 x)
 let utf8_for_field x = B.Name.make_for_field (utf8 x)
@@ -731,18 +705,3 @@ let () =
         -> eprintf "@[ERROR: %s@." m
 
 (* }}} *)
-(* TODO:
-  - Make the command "toplc <dir> <properties>" just work.
-  - Don't forget that methods in package "topl" should not be instrumented.
-  - a way to select properties (by name) from the command line
-  - a way to select where to put various outputs from the command line
-  - syntactic sugar for "prefix <X>; observable <X.*>" ?
-  - We need a syntax that makes sense for static methods. For eaxmple,
-    "*.foo()" seems much worse than "static foo()" when foo is static.
-    Even better would be "foo()".
-  - It is sometimes convenient to assume that another property was checked
-    when writing one property.  These dependencies should be recorded
-    explicitely.  First, the assummed properties should be automatically
-    selected (whenever one selects the assuming property by its names). Second,
-    we should check that there are no cycles.
- *)

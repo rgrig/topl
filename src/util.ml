@@ -223,10 +223,6 @@ let rec temp_path prefix =
       prefix
       (Int64.of_float (1000.0 *. Unix.gettimeofday ())))
 
-let open_out_p fn =
-  mkdir_p (Filename.dirname fn);
-  open_out fn
-
 (* Throws [Not_found] if [p] isn't a valid absolute path. *)
 (* TODO(rgrig): test on Windows and cygwin. *)
 let normalize_path p =

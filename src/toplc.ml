@@ -624,6 +624,13 @@ let instrument_method get_tag h c m =
     (get_tag PA.Return overrides)
     (bm_parameters c m)
     (bm_return m) in
+  let ic code =
+    let rec split xs ys = match xs, ys with
+      | (_, []) -> ([], List.rev xs)
+      | ((_, BI.INVOKESPECIAL _) :: _, _) -> (xs, ys)
+      | (_, y :: ys) -> split (y :: xs) ys in
+    let xs, ys = split [] code in
+    List.rev_append xs (ic ys) in
   let ia xs =
     let f = function
       | `Code c -> `Code { c with BA.code = ic c.BA.code }

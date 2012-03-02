@@ -312,7 +312,9 @@ public class Checker {
         }
 
         Treap<T> insert(T data) {
-	    System.out.println("Inserting " + data);
+            if (logTreap) {
+                System.out.println("Inserting " + data);
+            }
             return insert(random.nextInt(), data);
         }
 
@@ -321,7 +323,9 @@ public class Checker {
         }
 
         Treap<T> remove(T oldData) {
-	    System.out.println("Removing " + oldData);
+            if (logTreap) {
+	        System.out.println("Removing " + oldData);
+            }
             Treap<T> result = this;
             if (data != null) {
                 int c = oldData.compareTo(data);
@@ -613,7 +617,9 @@ public class Checker {
         public boolean evaluate(Event event, Treap<Binding> store) {
 	    Binding b = new Binding(storeIndex);
 	    boolean eq = valueEquals(event.values[eventIndex], store.get(b).value);
-	    System.out.println(eq ? "matches store" : "does NOT match store");
+            if (logGuard) {
+	        System.out.println(eq ? "matches store" : "does NOT match store");
+            }
             return eq;
         }
 
@@ -804,7 +810,6 @@ public class Checker {
     public boolean checkerEnabled = false; // brittle
     public synchronized void activate() {
         checkerEnabled = true;
-        System.out.println("Checker active");
     }
 
     final private Automaton automaton;
@@ -819,10 +824,7 @@ public class Checker {
     }
 
     void reportError(String msg) {
-        // TODO
-        //  - print trace
-        //  - throw exception?
-	System.out.println("\n********************\n* " + msg + "\n********************");
+        System.err.printf("TOPL: %s\n", msg);
     }
 
     public synchronized void check(Event event) {
@@ -830,12 +832,17 @@ public class Checker {
             return;
         }
         checkerEnabled = false;
-	System.out.print("Received event id " + event.id + "\nStates: ["); //DBG
-	for (State state : states)                                         //DBG
-	    System.out.println("\n  vertex: " + state.vertex +             //DBG
-			       "\n    events:" + state.events.size() +     //DBG
-			       "\n    bindings:" + state.store.size());    //DBG
-	System.out.println("]");                                           //DBG
+        if (logState) {
+            boolean first = true;
+            System.out.printf("States");
+            for (State s : states) {
+                System.out.printf("\n  %s ( vertex = %s; len(events) = %d; len(bindings) = %d )",
+                        first ? "{" : ",",
+                        s.vertex, s.events.size(), s.store.size());
+            }
+            System.out.printf(" }\n");
+            System.out.printf("event %d\n", event.id);
+        }
         HashSet<State> newActiveStates = new HashSet<State>();
         for (State state : states) {
             if (!automaton.isObservable(event.id, state.vertex)) {
@@ -1052,13 +1059,9 @@ public class Checker {
 	return toDOT(0);
     }
 
-    public static void main(String[] args) {
-        //CheckerTests t = new CheckerTests();
-        //t.c.check(new Event(5, new Object[]{}));
-        //t.c.check(new Event(4, new Object[]{}));
-        //t.c.check(new Event(1, new Object[]{}));
-        //t.c.check(new Event(0, new Object[]{}));
-    }
+    private static boolean logGuard = false;
+    private static boolean logState = false;
+    private static boolean logTreap = false;
     // }}}
 }
 /* TODO {{{

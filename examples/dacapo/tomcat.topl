@@ -15,8 +15,8 @@ property ForwardOnlyUncommittedResponses
   tracking -> error: call *.<RequestDispatcher.forward>(*, r)
 
 property ResponseUsesEitherWriterOrStream
-  observe <javax.ServletResponse.{getOutputStream,getWriter}>
-  prefix <javax.ServletResponse>
+  observe <javax.servlet.ServletResponse.{getOutputStream,getWriter}>
+  prefix <javax.servlet.ServletResponse>
   start -> start: *
   start -> gotWriter: R.getWriter()
   start -> gotStream: R.getOutputStream()

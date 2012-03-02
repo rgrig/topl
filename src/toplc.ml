@@ -374,12 +374,20 @@ let checker = utf8_for_class "topl.Checker"
 let check = utf8_for_method "check"
 
 (* helpers for handling bytecode of methods *) (* {{{ *)
-let bm_parameters c = function
-  | BM.Regular m ->
-      (if List.mem `Static m.BM.flags then [] else [`Class c])
-      @ fst m.BM.descriptor
-  | BM.Constructor m -> `Class c :: m.BM.cstr_descriptor
-  | BM.Initializer _ -> []
+let bm_parameters c =
+  let ts = List.map (fun x -> (true, x)) in
+  function
+    | BM.Regular m ->
+        ts ((if List.mem `Static m.BM.flags then [] else [`Class c])
+        @ fst m.BM.descriptor)
+    | BM.Constructor m -> (false, `Class c) :: ts m.BM.cstr_descriptor
+    | BM.Initializer _ -> []
+
+let bm_arity m =
+  let c = utf8_for_class "DummyClass943RB" in (* unique name, helps debuging *)
+  let ps = bm_parameters c m in
+  let ps = List.filter fst ps in
+  List.length ps
 
 let bm_return = function
   | BM.Regular r -> snd r.BM.descriptor
@@ -399,11 +407,7 @@ let bm_map_attributes f = function
 
 (* }}} *)
 let mk_method m =
-  let method_name = bm_name m in
-  let dummy_name = utf8_for_class "DummyClassSBW6" in
-    (* The string at the end of [dummy_name] is random. You can search by it. *)
-  let method_arity = List.length (bm_parameters dummy_name m) in
-  { method_name; method_arity }
+  { method_name = bm_name m; method_arity = bm_arity m }
 
 (* bytecode generating helpers *) (* {{{ *)
 let bc_print_utf8 us = [
@@ -461,16 +465,15 @@ let bc_load i = function
   | `Long -> BI.LLOAD i
   | `Short -> BI.ILOAD i
 
-let bc_array_set index t =
-  [
-    BI.DUP;
-    bc_push index;
-    bc_load index t
-  ] @
-    bc_box t @
-  [
-    BI.AASTORE
-  ]
+let bc_array_set l a t =
+  let t = match t with
+    | #B.Descriptor.for_parameter as t' -> t'
+    | _ -> failwith "INTERNAL: trying to record a void" in
+  [ BI.DUP
+  ; bc_push a
+  ; bc_load l t ]
+  @ bc_box t
+  @ [ BI.AASTORE ]
 
 let bc_new_event id =
   [
@@ -527,12 +530,18 @@ let get_tag x =
           Some !cnt
   end else None
 
-let bc_send_event id param_types =
-  let instructions = List.flatten (U.map_with_index bc_array_set param_types) in
-    (bc_new_object_array (List.length param_types)) @
-    instructions @
-    (bc_new_event id) @
-    bc_check
+let bc_send_call_event id param_types =
+  let n = List.length (List.filter fst param_types) in
+  let sz (t : B.Descriptor.for_parameter) =
+    B.Descriptor.size (t :> B.Descriptor.java_type) in
+  let rec set l a ss = function
+    | (false, t) :: ts -> set (l + sz t) a ss ts
+    | (true, t) :: ts -> set (l + sz t) (succ a) (bc_array_set l a t :: ss) ts
+    | [] -> List.flatten ss in
+  bc_new_object_array n
+  @ set 0 0 [] param_types
+  @ bc_new_event id
+  @ bc_check
 
 let bc_send_return_event id return_type =
   let bc_save_return_value,
@@ -589,7 +598,7 @@ let rec add_return_code return_code = function
 let instrument_code call_id return_id param_types return_types code =
   let bc_send_call_event = match call_id with
     | None -> []
-    | Some id -> bc_send_event id param_types in
+    | Some id -> bc_send_call_event id param_types in
   let bc_send_ret_event = match return_id with
     | None -> []
     | Some id -> bc_send_return_event id return_types in
@@ -624,13 +633,6 @@ let instrument_method get_tag h c m =
     (get_tag PA.Return overrides)
     (bm_parameters c m)
     (bm_return m) in
-  let ic code =
-    let rec split xs ys = match xs, ys with
-      | (_, []) -> ([], List.rev xs)
-      | ((_, BI.INVOKESPECIAL _) :: _, _) -> (xs, ys)
-      | (_, y :: ys) -> split (y :: xs) ys in
-    let xs, ys = split [] code in
-    List.rev_append xs (ic ys) in
   let ia xs =
     let f = function
       | `Code c -> `Code { c with BA.code = ic c.BA.code }

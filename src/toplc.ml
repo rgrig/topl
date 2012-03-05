@@ -644,9 +644,9 @@ let pp_class f c =
     fprintf f "@[%s@]" (B.Utils.UTF8.to_string (B.Name.internal_utf8_for_class c.BC.name))
 
 let instrument_class get_tags h c =
-  if log_cp then printf "@\n@[instrument %a@]" pp_class c;
+  if log_cp then printf "@\n@[<2>begin instrument %a" pp_class c;
   let instrumented_methods = List.map (instrument_method get_tags h c.BC.name) c.BC.methods in
-  if log_cp then printf "@\n@[...done@]";
+  if log_cp then printf "@]@\nend instrument %a@\n" pp_class c;
     {c with BC.methods = instrumented_methods}
 
 let compute_inheritance in_dir =
@@ -681,6 +681,7 @@ let check_work_directory d =
   with Not_found -> raise e
 
 let () =
+  printf "@[";
   let usage = Printf.sprintf
     "usage: %s -i <dir> [-o <dir>] <topls>" Sys.argv.(0) in
   try
@@ -706,11 +707,12 @@ let () =
     ClassMapper.map in_dir tmp_dir (instrument_class (get_tag p) h);
     generate_checkers tmp_dir p;
     U.rm_r out_dir;
-    U.rename tmp_dir out_dir
+    U.rename tmp_dir out_dir;
+    printf "@."
   with
     | Bad_arguments m
     | Helper.Parsing_failed m
 (*     | Sys_error m *)
-        -> eprintf "@[ERROR: %s@." m
+        -> eprintf "@[ERROR: %s@." m; printf "@."
 
 (* }}} *)

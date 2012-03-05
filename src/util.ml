@@ -140,7 +140,6 @@ let rec rel_fs_preorder top m f =
   let here = top/f in
   assert (Sys.is_directory here);
   let pc c =
-    if log_cm then printf "@\n@[rel_fs_preorder %s %s@]" top f;
     m top (f/c);
     if Sys.is_directory (here/c) then
       rel_fs_preorder top m (f/c) in

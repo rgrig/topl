@@ -10,7 +10,7 @@ let (/) d f =
     if d = F.current_dir_name then f
     else F.concat d f
 
-let is_jar f = F.check_suffix f ".jar"
+let is_jar f = List.exists (F.check_suffix f) [".jar"; ".zip"]
 let is_class f = F.check_suffix f ".class"
 
 let ensure_dir f =
@@ -64,7 +64,7 @@ let output_class version fn c =
 
 let rec map in_dir out_dir f =
   let process_jar jf =
-    if log_cm then printf "@\n@[map jar: %s@]" (in_dir / jf);
+    if log_cm then printf "@\n@[<2>map jar: %s" (in_dir / jf);
     let tmp_in_dir = U.mk_tmp_dir "in_" "_jar" in
     let tmp_out_dir = U.mk_tmp_dir "out_" "_jar" in
     let jar_in = Zip.open_in (in_dir / jf) in
@@ -87,30 +87,33 @@ let rec map in_dir out_dir f =
          Zip.copy_file_to_entry (tmp_out_dir / fn) jar_out fn) in
     U.rel_fs_preorder tmp_out_dir intract "";
     Zip.close_out jar_out;
-    U.rm_r tmp_out_dir in
+    U.rm_r tmp_out_dir;
+    if log_cm then printf "@]" in
   let process_class fn =
-    if log_cm then printf "@\n@[map class: %s@]" (in_dir / fn);
+    if log_cm then printf "@\n@[<2>map class: %s" (in_dir / fn);
     let copy () = U.cp (in_dir / fn) (out_dir / fn) in
-    match open_class (in_dir / fn) with
-    | None -> copy ()
-    | Some (cd, version) ->
-        let inst_cd = f cd in
-        if not (output_class version (out_dir / fn) inst_cd) then copy () in
+    (match open_class (in_dir / fn) with
+      | None -> copy ()
+      | Some (cd, version) ->
+          let inst_cd = f cd in
+          if not (output_class version (out_dir / fn) inst_cd) then copy ());
+    if log_cm then printf "@]" in
   let process _ fn =
-    if log_cm then printf "@\n@[map: %s@]" (in_dir / fn);
+    if log_cm then printf "@\n@[<2>map: %s" (in_dir / fn);
     if Sys.is_directory (in_dir / fn) then U.mkdir_p (out_dir / fn)
     else begin
       if is_jar fn then process_jar fn
       else if is_class fn then process_class fn
       else U.cp (in_dir / fn) (out_dir / fn)
-    end in
+    end;
+    if log_cm then printf "@]" in
   if log_cm then printf "@\n@[map: %s -> %s@]" in_dir out_dir;
   U.mkdir_p out_dir;
   U.rel_fs_preorder in_dir process ""
 
 let rec iter in_dir f =
   let iter_jar jf =
-    if log_cm then printf "@[iter jar: %s@]" jf;
+    if log_cm then printf "@\n@[<2>iter jar: %s" jf;
     let tmp_in_dir = U.mk_tmp_dir "iter_" "_jar" in
     let jar_in = Zip.open_in (in_dir / jf) in
     let extract e =
@@ -120,18 +123,19 @@ let rec iter in_dir f =
     List.iter extract (Zip.entries jar_in);
     Zip.close_in jar_in;
     iter tmp_in_dir f;
-    U.rm_r tmp_in_dir in
+    U.rm_r tmp_in_dir;
+    if log_cm then printf "@]" in
   let iter_class fn =
-    if log_cm then printf "@\n@[iter class: %s@]" fn;
-    match open_class (in_dir / fn) with
-    | None -> ()
-    | Some (cd, _) -> f cd in
+    if log_cm then printf "@\n@[<2>iter class: %s" fn;
+    (match open_class (in_dir / fn) with None -> () | Some (cd, _) -> f cd);
+    if log_cm then printf "@]" in
   let process _ fn =
-    if log_cm then  printf "@[iterating %s@." (in_dir / fn);
+    if log_cm then printf "@\n@[<2>iterating %s" (in_dir / fn);
     if Sys.is_directory (in_dir / fn)
-    then (if log_cm then printf "@[directory@.")
+    then (if log_cm then printf "@\ndirectory")
     else if is_jar fn then iter_jar fn
-    else if is_class fn then iter_class fn in
+    else if is_class fn then iter_class fn;
+    if log_cm then printf "@]" in
   U.rel_fs_preorder in_dir process ""
 
 (*

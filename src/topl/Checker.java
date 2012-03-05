@@ -41,6 +41,80 @@ public class Checker {
     }
     // }}}
     // Queue<T> {{{
+    /*
+    static class Queue<T> implements Iterable<T> {
+        private T a, b; // inv: a != null || b == null
+        private int hash;
+        Queue(T a, T b) {
+            this.a = a;
+            this.b = b;
+            if (a != null) {
+                hash = a.hashCode();
+                if (b != null) {
+                    hash += b.hashCode();
+                }
+            }
+        }
+        static private <T> Queue<T> mk(T a, T b) {
+            return new Queue<T>(a, b);
+        }
+        static <T> Queue<T> empty() {
+            return mk(null, null);
+        }
+        public Queue<T> push(T x) {
+            assert x != null;
+            assert a != null || b == null;
+            assert a == null || b == null;
+            if (a == null) {
+                return mk(x, b);
+            } else {
+                return mk(a, x);
+            }
+        }
+        public Queue<T> pop() {
+            assert a != null;
+            return mk(b, null);
+        }
+        public T top() {
+            assert a != null;
+            return a;
+        }
+        public int size() {
+            return a == null? 0 : (b == null? 1 : 2);
+        }
+        @Override
+        public Iterator<T> iterator() {
+            return new Itr();
+        }
+        @Override
+        public int hashCode() {
+            return hash;
+        }
+        @Override
+        public boolean equals(Object other) {
+            Queue otherQueue = (Queue) other; // yes, exception wanted
+            return a == otherQueue.a && b == otherQueue.b;
+        }
+        private class Itr implements Iterator<T> {
+            int state;
+
+            @Override
+            public boolean hasNext() {
+                return (state == 0 && a != null) || (state == 1 && b != null);
+            }
+
+            @Override
+            public T next() {
+                ++state;
+                return state == 1? a : b;
+            }
+            @Override
+            public void remove() {
+                throw new UnsupportedOperationException();
+            }
+        }
+    }
+    */
     static class Queue<T> implements Iterable<T> {
         static private class N<T> {
             T data;

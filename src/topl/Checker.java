@@ -745,10 +745,13 @@ public class Checker {
 		return 31*vertex + 101*eventId;
 	    }
         }
-        private HashSet<VertexEvent> observable = new HashSet<VertexEvent>();
+	private boolean[][] observable;
+	   // {observable[p][e]} is on iff property {p} observes event {e}
 
         final int[] startVertices;
         final String[] errorMessages;
+
+        final int[] filterOfState;
 
         final Transition[][] transitions;
             // {transitions[vertex]} are the outgoing transitions of {vertex}
@@ -756,23 +759,40 @@ public class Checker {
 	public int[] maximumTransitionDepths;
             // {maximumTransitionDepths[vertex]} is the maximum depths of outgoing transitions of {vertex}
 
+	/**
+	 * @param startVertices startVertices[p] has start vertex for property p
+	 * @param erorMessages erorMessages[i] is null if vertex i is not accepting
+	 * @param transitions transitions[i][j] is transtion from vertex i to vertex j
+	 * @param filterOfState filterOfState[i] is the property that vertex i belongs to
+	 * @param filters filters[p][n] is the event id of the n'th event that property p observes
+	 */
         Automaton(int[] startVertices, String[] errorMessages,
                 Transition[][] transitions, int[] filterOfState,
                 int[][] filters) {
             this.startVertices = startVertices;
             this.errorMessages = errorMessages;
+            this.filterOfState = filterOfState;
             this.transitions = transitions;
 	    maximumTransitionDepths = new int[transitions.length];
             for (int s = 0; s < transitions.length; ++s) {
-                for (int e : filters[filterOfState[s]]) {
-                    observable.add(new VertexEvent(s, e));
-                }
 		maximumTransitionDepths[s] = 0;
 		for (Transition t : transitions[s]) {
 		    maximumTransitionDepths[s] = Math.max(
                                 maximumTransitionDepths[s], t.steps.length);
 		}
             }
+	    int maxEvent = 0;
+	    for (int[] f : filters) {
+		for (int e : f) {
+		    if (e > maxEvent) maxEvent = e;
+		}
+	    }
+	    observable = new boolean[filters.length][maxEvent];
+	    for (int f = 0; f < filters.length; f++) {
+		for (int e = 0; e < maxEvent; e++) {
+		    observable[f][e] = true;
+		}
+	    }	    
             assert check();
         }
 
@@ -802,7 +822,7 @@ public class Checker {
         }
 
         boolean isObservable(int eventId, int vertex) {
-            return observable.contains(new VertexEvent(vertex, eventId));
+	    return observable[filterOfState[vertex]][eventId];
         }
     }
     // }}}

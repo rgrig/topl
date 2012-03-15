@@ -112,6 +112,16 @@ public class Checker {
                 throw new UnsupportedOperationException();
             }
         }
+
+        public String toString () {
+            StringBuilder sb = new StringBuilder();
+            sb.append('<');
+            for (T t : this) {
+                sb.append(" " + t);
+            }
+            sb.append(" >");
+            return sb.toString();
+	}
     }
     /*
     static class Queue<T> implements Iterable<T> {

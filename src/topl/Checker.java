@@ -41,11 +41,11 @@ public class Checker {
     }
     // }}}
     // Queue<T> {{{
-    /*
     static class Queue<T> implements Iterable<T> {
         private T a, b; // inv: a != null || b == null
         private int hash;
         Queue(T a, T b) {
+            assert a != null || b == null;
             this.a = a;
             this.b = b;
             if (a != null) {
@@ -63,8 +63,7 @@ public class Checker {
         }
         public Queue<T> push(T x) {
             assert x != null;
-            assert a != null || b == null;
-            assert a == null || b == null;
+            assert b == null;
             if (a == null) {
                 return mk(x, b);
             } else {
@@ -114,7 +113,7 @@ public class Checker {
             }
         }
     }
-    */
+    /*
     static class Queue<T> implements Iterable<T> {
         static private class N<T> {
             T data;
@@ -231,7 +230,7 @@ public class Checker {
                 (hash == otherQueue.hash &&
                 equalIterators(iterator(), otherQueue.iterator()));
         }
-    }
+    }*/
     // }}}
     // Treap<T extends Comparable<T>> {{{
     static class Treap<T extends Comparable<T>> implements Iterable<T> {

@@ -243,6 +243,7 @@ let pq_automaton ioc f x =
   fprintf f "%a@\n" (pq_array pp_int) pov;
   fprintf f "%a@\n" (pq_list (pq_list pp_int)) obs_tags
 
+
 let index_constants p =
   let r = Hashtbl.create 13 in (* maps constants to their index *)
   let i = ref (-1) in
@@ -281,8 +282,8 @@ let generate_checkers out_dir p =
   let (jc, j), (tc, t) = o "java", o "text" in
   let ioc = index_constants p in
   let coi = inverse_index (fun x -> x) ioc in
-  pq_constants j coi;
-  pq_automaton ioc t p;
+  fprintf j "@[%a@." pq_constants coi;
+  fprintf t "@[%a@." (pq_automaton ioc) p;
   List.iter close_out_noerr [jc; tc];
   ignore (Sys.command
     (Printf.sprintf

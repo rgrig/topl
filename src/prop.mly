@@ -76,13 +76,22 @@
       | _ -> acc in
     Util.fold_with_index f []
 
-  let mk_label g t vs =
-    let g =
-      { PA.tag_guard = { g.PA.tag_guard with PA.event_type = Some t }
-      ; PA.value_guards = mk_value_guards vs } in
-    PA.check_event_guard g;
-    { PA.guard = g
-    ; PA.action = mk_action vs }
+  let mk_label t g rvs cvs =
+    let rgs, ras = mk_value_guards rvs, mk_action rvs in
+    let cgs, cas = mk_value_guards cvs, mk_action cvs in
+    assert (t <> Some PA.Call || (rgs = [] && ras = []));
+    assert (t <> Some PA.Return || (cgs = [] && cas = []));
+    let mk t' xgs xas =
+      if t = t' || t' = None || (t = None && (xgs <> [] || xas <> [])) then
+        let g =
+          { PA.tag_guard = { g.PA.tag_guard with PA.event_type = t' }
+          ; PA.value_guards = xgs } in
+        PA.check_event_guard g;
+        [ { PA.guard = g; PA.action = xas } ]
+      else [] in
+    match mk (Some PA.Call) cgs cas @ mk (Some PA.Return) rgs ras with
+      | [] -> mk None [] []
+      | l -> l
 
   let mk_transitions s t lss =
     let f ls = { PA.source = s; PA.target = t; PA.labels = ls } in
@@ -152,19 +161,15 @@ transition:
 
 big_label:
     RETURN v=value_pattern ASGN g=label_rhs(any_value)
-      { [mk_label g PA.Return [v]] }
+      { mk_label (Some PA.Return) g [v] [] }
   | RETURN g=label_rhs(any_value)
-      { [mk_label g PA.Return []] }
-  | CALL STAR ASGN g=label_rhs(value_pattern)
-      { [mk_label g PA.Call g.PA.value_guards] }
+      { mk_label (Some PA.Return) g [] [] }
   | CALL g=label_rhs(value_pattern)
-      { [mk_label g PA.Call g.PA.value_guards] }
+      { mk_label (Some PA.Call) g [] g.PA.value_guards }
   | g=label_rhs(value_pattern)
-      { [ mk_label g PA.Call g.PA.value_guards
-        ; mk_label g PA.Return [GuardAny] ] }
+      { mk_label None g [] g.PA.value_guards }
   | v=value_pattern ASGN g=label_rhs(value_pattern)
-      { [ mk_label g PA.Call g.PA.value_guards
-        ; mk_label g PA.Return [v] ] }
+      { mk_label None g [v] g.PA.value_guards }
 
 label_rhs(ValuePattern):
     v=ValuePattern DOT m=method_pattern(ValuePattern)

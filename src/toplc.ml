@@ -266,7 +266,7 @@ let pq_constants j constants =
   fprintf j   "new Object[]{%a@]};" (pp_v_list pp_string) constants;
   fprintf j "@\n@[<2>public static final Checker checker =@ ";
   fprintf j   "Checker.Parser.checker(\"topl\" + java.io.File.separator + \"Property.text\",@ constants);@]";
-  fprintf j "@\n@[static { checker.activate(); } @]";
+  fprintf j "@\n@[static { checker.activate(); }@]";
   fprintf j "@]@\n}@]"
 
 let generate_checkers out_dir p =
@@ -418,7 +418,6 @@ let bc_print_utf8 us = [
 			     ([`Class java_lang_String], `Void)));
 ]
 let bc_print s = bc_print_utf8 (utf8 s)
-let bc_print_par p = bc_print_utf8 (p.B.Signature.identifier)
 
 let bc_push = function
   | 0 -> BI.ICONST_0

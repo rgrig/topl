@@ -126,15 +126,6 @@ let fresh_internal_id =
 
 let todo () = failwith "todo"
 
-(* TODO(rgrig): Remove if unused. *)
-let cartesian xss =
-  let rec f acc = function
-    | [] -> List.map List.rev acc
-    | xs :: xss ->
-        let ys = List.map (fun x -> List.map (fun ys -> x :: ys) acc) xs in
-        f (List.concat ys) xss in
-  f [[]] xss
-
 let rec rel_fs_preorder top m f =
   let (/) = Filename.concat in
   let here = top/f in

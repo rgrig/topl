@@ -620,6 +620,18 @@ public class Checker {
         State popEvent() {
             return new State(vertex, store, events.pop(), parent);
         }
+
+	public String toString () {
+            StringBuilder sb = new StringBuilder();
+            sb.append("Verttex: " + vertex);
+            sb.append("\nStore:\n" + store);
+            sb.append("\nEvents in queue:\n" + events);
+            if (parent != null) {
+                sb.append("\n---reached via events---\n" + parent.events);
+                sb.append("\n---from state---\n" + parent.state);
+            }
+            return sb.toString();
+        }
     }
 
     interface Guard {
@@ -916,8 +928,10 @@ public class Checker {
         }
     }
 
-    void reportError(String msg) {
+    void reportError(String msg, State errorState) {
         System.err.printf("TOPL: %s\n", msg);
+        System.err.println("TOPL: Error trace:");
+        System.err.println(errorState);
     }
 
     public synchronized void check(Event event) {
@@ -974,13 +988,14 @@ public class Checker {
                 if (i == transition.steps.length) {
 //DBG System.out.println("tran"); //DBG
 		    anyEnabled = true;
-                    newActiveStates.add(State.make(transition.target, store,
-                            events, consumed, state));
+		    State newState = State.make(transition.target, store,
+						events, consumed, state);
+                    newActiveStates.add(newState);
 
                     // check for error state
                     String msg = automaton.errorMessages[transition.target];
                     if (msg != null) {
-                        reportError(msg);
+                        reportError(msg, newState);
                     }
                 }
             }

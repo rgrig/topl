@@ -940,8 +940,8 @@ public class Checker {
 
     void reportError(String msg, State errorState) {
         System.err.printf("TOPL: %s\n", msg);
-        System.err.println("TOPL: Error trace:");
-        System.err.println(errorState);
+        //System.err.println("TOPL: Error trace:");
+        //System.err.println(errorState);
     }
 
     public synchronized void check(Event event) {
@@ -962,6 +962,9 @@ public class Checker {
         }
         HashSet<State> newActiveStates = new HashSet<State>();
         for (State state : states) {
+            if (automaton.transitions[state.vertex].length == 0) {
+                continue;
+            }
             if (!automaton.isObservable(event.id, state.vertex)) {
                 newActiveStates.add(state);
 		continue;

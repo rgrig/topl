@@ -234,12 +234,12 @@ let pq_transition tags ioc f { steps = ss; target = t } =
 let pq_vertex tags ioc f v =
   fprintf f "%a" (pq_list (pq_transition tags ioc)) v.outgoing_transitions
 
-let pq_pattern_name f pi pn =
+let pq_event_name f pi pn =
   fprintf f "%d %s" pi pn
 
-let pq_pattern_names f pns =
-  fprintf f "%d " (Hashtabl.length pns); 
-  Hashtbl.iter (pq_pattern_name f) pns
+let pq_event_names f pns =
+  fprintf f "%d " (Hashtbl.length pns); 
+  Hashtbl.iter (pq_event_name f) pns
 
 let pq_automaton ioc f x =
   let pov = compute_pov x in
@@ -249,8 +249,8 @@ let pq_automaton ioc f x =
   fprintf f "%a@\n" (pq_list (pq_string ioc)) (errors x);
   fprintf f "%a@\n" (pq_array (pq_vertex x.pattern_tags ioc)) x.vertices;
   fprintf f "%a@\n" (pq_array pp_int) pov;
-  fprintf f "%a@\n" (pq_list (pq_list pp_int)) obs_tags
-  fprintf f "%a@\n" pq_pattern_names x.pattern_names
+  fprintf f "%a@\n" (pq_list (pq_list pp_int)) obs_tags;
+  fprintf f "%a@\n" pq_event_names x.event_names
 
 
 let index_constants p =

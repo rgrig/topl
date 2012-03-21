@@ -69,7 +69,8 @@ type vertex_data =
 type automaton =
   { vertices : vertex_data array
   ; observables : (property, tag_guard) Hashtbl.t
-  ; pattern_tags : (tag_guard, tag list) Hashtbl.t }
+  ; pattern_tags : (tag_guard, tag list) Hashtbl.t
+  ; event_names : (int, string) Hashtbl.t }
   (* The keys of [pattern_tags] are filled in during the initial conversion,
     but the values (the tag list) is filled in while the code is being
     instrumented. *)
@@ -233,6 +234,13 @@ let pq_transition tags ioc f { steps = ss; target = t } =
 let pq_vertex tags ioc f v =
   fprintf f "%a" (pq_list (pq_transition tags ioc)) v.outgoing_transitions
 
+let pq_pattern_name f pi pn =
+  fprintf f "%d %s" pi pn
+
+let pq_pattern_names f pns =
+  fprintf f "%d " (Hashtabl.length pns); 
+  Hashtbl.iter (pq_pattern_name f) pns
+
 let pq_automaton ioc f x =
   let pov = compute_pov x in
   let obs_p p = Hashtbl.find x.pattern_tags (Hashtbl.find x.observables p) in
@@ -242,6 +250,7 @@ let pq_automaton ioc f x =
   fprintf f "%a@\n" (pq_array (pq_vertex x.pattern_tags ioc)) x.vertices;
   fprintf f "%a@\n" (pq_array pp_int) pov;
   fprintf f "%a@\n" (pq_list (pq_list pp_int)) obs_tags
+  fprintf f "%a@\n" pq_pattern_names x.pattern_names
 
 
 let index_constants p =
@@ -332,7 +341,8 @@ let transform_properties ps =
   let full_p =
     { vertices = inverse_index mk_vd iov
     ; observables = Hashtbl.create 13
-    ; pattern_tags = Hashtbl.create 13 } in
+    ; pattern_tags = Hashtbl.create 13
+    ; event_names = Hashtbl.create 13 } in
   let add_obs_tags p =
     let obs_tag =
       { PA.event_type = None
@@ -512,7 +522,7 @@ let does_method_match
     ba && bt && bn
 
 let get_tag x =
-  let cnt = ref (-1) in fun t (mns, ma) ->
+  let cnt = ref (-1) in fun t (mns, ma) mn ->
   let fp s p1 p2 acc =
     let p = s (p1, p2) in
     let cm mn = does_method_match ({method_name=mn; method_arity=ma}, t) p in
@@ -525,7 +535,8 @@ let get_tag x =
           let at p =
             let ts = Hashtbl.find x.pattern_tags p in
             (* printf "added tag %d\n" !cnt; *)
-            Hashtbl.replace x.pattern_tags p (!cnt :: ts) in
+            Hashtbl.replace x.pattern_tags p (!cnt :: ts);
+            Hashtbl.replace x.event_names !cnt mn in
           List.iter at ps;
           Some !cnt
   end else None
@@ -627,10 +638,11 @@ let raise_stack n x =
   B.Utils.u2 ((x : B.Utils.u2 :> int) + n)
 
 let instrument_method get_tag h c m =
-  let overrides = get_overrides h c (mk_method m) in
+  let mth = mk_method m in
+  let overrides = get_overrides h c mth in
   let ic = instrument_code
-    (get_tag PA.Call overrides)
-    (get_tag PA.Return overrides)
+    (get_tag PA.Call overrides mth.method_name)
+    (get_tag PA.Return overrides mth.method_name)
     (bm_parameters c m)
     (bm_return m) in
   let ia xs =

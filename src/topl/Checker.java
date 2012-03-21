@@ -853,6 +853,7 @@ public class Checker {
 
 	public int[] maximumTransitionDepths;
             // {maximumTransitionDepths[vertex]} is the maximum depths of outgoing transitions of {vertex}
+        final String[] eventNames;
 
 	/**
 	 * @param startVertices startVertices[p] has start vertex for property p
@@ -862,12 +863,13 @@ public class Checker {
 	 * @param filters filters[p][n] is the event id of the n'th event that property p observes
 	 */
         Automaton(int[] startVertices, String[] errorMessages,
-                Transition[][] transitions, int[] filterOfState,
-                int[][] filters) {
+                  Transition[][] transitions, int[] filterOfState,
+                  int[][] filters, String[] eventNames) {
             this.startVertices = startVertices;
             this.errorMessages = errorMessages;
             this.filterOfState = filterOfState;
             this.transitions = transitions;
+            this.eventNames = eventNames;
 	    maximumTransitionDepths = new int[transitions.length];
             for (int s = 0; s < transitions.length; ++s) {
 		maximumTransitionDepths[s] = 0;
@@ -938,9 +940,34 @@ public class Checker {
         }
     }
 
+    void printEventQueue(Queue<Event> events) {
+        StringBuilder sb = new StringBuilder();
+        sb.append('<');
+        for (Event e : events) {
+            sb.append(" " + automaton.eventNames[e.id] + "(");
+            for(Object o : e.values) {
+                sb.append(o.toString());
+            }
+            sb.append(")");
+        }
+        sb.append(" >");
+        System.err.println(sb.toString());
+    }
+
+    void printErrorTrace(State errorState) {
+        if (errorState.parent != null) {
+	    printErrorTrace(errorState.parent.state);
+	    System.err.println("\n---- via events ----");
+	    printEventQueue(errorState.parent.events);
+	    System.err.println("\n--- got to state ---");
+	}
+        System.err.println(errorState.vertex);
+    }
+
     void reportError(String msg, State errorState) {
         System.err.printf("TOPL: %s\n", msg);
-        //System.err.println("TOPL: Error trace:");
+        System.err.println("TOPL: Error trace:");
+        printErrorTrace(errorState);
         //System.err.println(errorState);
     }
 
@@ -1054,8 +1081,13 @@ public class Checker {
             for (int i = 0; i < filters.length; ++i) {
                 filters[i] = ints();
             }
+	    String[] eventNames = new String[scan.nextInt()];
+            for (int i = 0; i < eventNames.length; ++i) {
+                int index = scan.nextInt();
+                eventNames[index] = scan.next();
+            }
             return new Automaton(startVertices, errorMessages, transitions,
-                filterOfState, filters);
+                                 filterOfState, filters, eventNames);
         }
 
         Transition[] vertex() {

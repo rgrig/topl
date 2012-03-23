@@ -235,10 +235,10 @@ let pq_vertex tags ioc f v =
   fprintf f "%a" (pq_list (pq_transition tags ioc)) v.outgoing_transitions
 
 let pq_event_name f pi pn =
-  fprintf f "%d %s" pi pn
+  fprintf f " %d %s" pi pn
 
 let pq_event_names f pns =
-  fprintf f "%d " (Hashtbl.length pns); 
+  fprintf f "%d " (Hashtbl.length pns);
   Hashtbl.iter (pq_event_name f) pns
 
 let pq_automaton ioc f x =

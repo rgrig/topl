@@ -884,12 +884,12 @@ public class Checker {
 		    if (e > maxEvent) maxEvent = e;
 		}
 	    }
-	    observable = new boolean[filters.length][maxEvent];
+	    observable = new boolean[filters.length][maxEvent + 1];
 	    for (int f = 0; f < filters.length; f++) {
 		for (int e = 0; e < maxEvent; e++) {
 		    observable[f][e] = true;
 		}
-	    }	    
+	    }
             assert check();
         }
 

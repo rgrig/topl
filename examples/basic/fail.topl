@@ -1,0 +1,4 @@
+property AlwaysFails
+  observe <*>
+  start -> start: *
+  start -> error: *

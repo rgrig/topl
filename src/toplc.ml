@@ -282,7 +282,7 @@ let pq_constants j constants =
   fprintf j   "new Object[]{%a@]};" (pp_v_list pp_string) constants;
   fprintf j "@\n@[<2>public static final Checker checker =@ ";
   fprintf j   "Checker.Parser.checker(\"topl\" + java.io.File.separator + \"Property.text\",@ constants);@]";
-  fprintf j "@\n@[static { checker.activate(); }@]";
+  fprintf j "@\n@[static { checker.checkerEnabled = true; }@]";
   fprintf j "@]@\n}@]"
 
 let generate_checkers out_dir p =

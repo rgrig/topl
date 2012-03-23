@@ -586,17 +586,16 @@ public class Checker {
         // These keep a history for reporting traces. From the point of view
         // of semantics of the automaton, two states that differ in their
         // histories are essentially equivalent.
-        // TODO
-        final int time;
+        int time;  // length of the parent list
         Parent parent;
 
-        State(int vertex, Treap<Binding> store, Queue<Event> events,
+        private State(int vertex, Treap<Binding> store, Queue<Event> events,
                 Parent parent) {
             this.vertex = vertex;
             this.store = store;
             this.events = events;
             this.parent = parent;
-            this.time = parent == null? 0 : parent.state.time + 1;
+            this.time = 1 + (parent == null? 0 : parent.state.time);
         }
 
         @Override
@@ -924,20 +923,12 @@ public class Checker {
     }
     // }}}
     // checker {{{
-    public boolean checkerEnabled = false; // brittle
-    public synchronized void activate() {
-        checkerEnabled = true;
-    }
-
     public boolean verbose = false;
+    public boolean checkerEnabled = false;
     public int historyLength = 10;
 
     final private Automaton automaton;
     private HashSet<State> states;
-
-    private HashMap<Integer, ArrayDeque<State>> stateByTime =
-        new HashMap<Integer, ArrayDeque<State>>();
-    private int smallestTime = Integer.MAX_VALUE;
 
     public Checker(Automaton automaton) {
         this.automaton = automaton;
@@ -979,6 +970,19 @@ public class Checker {
         }
     }
 
+    // Used for truncating traces.
+    private static void fixTimeOfState(State s) {
+        assert s != null;
+        assert s.time == -1;
+        s.time = 1;
+        if (s.parent == null || s.parent.state.time != -1) {
+            s.parent = null;
+        } else {
+            fixTimeOfState(s.parent.state);
+            s.time += s.parent.state.time;
+        }
+    }
+
     public synchronized void check(Event event) {
         if (!checkerEnabled) {
             return;
@@ -995,19 +999,18 @@ public class Checker {
             System.out.printf(" }\n");
             System.out.printf("event %d\n", event.id);
         }
-        ArrayDeque<State> remainActive = new ArrayDeque<State>();
         HashSet<State> newActiveStates = new HashSet<State>(2 * states.size());
         for (State state : states) {
             if (automaton.transitions[state.vertex].length == 0) {
                 continue;
             }
             if (!automaton.isObservable(event.id, state.vertex)) {
-                remainActive.add(state);
+                newActiveStates.add(state);
 		continue;
             }
             state = state.pushEvent(event);
             if (state.events.size() < automaton.maximumTransitionDepths[state.vertex]) {
-                remainActive.add(state);
+                newActiveStates.add(state);
                 continue;
             }
 	    boolean anyEnabled = false;
@@ -1055,37 +1058,39 @@ public class Checker {
         }
 
         // Truncate traces.
-        int minActiveTime = Integer.MAX_VALUE;
-        for (State s : remainActive) {
-            minActiveTime = Math.min(minActiveTime, s.time);
-        }
-        for (State s : states) {
-            minActiveTime = Math.min(minActiveTime, s.time);
-        }
-        for (State s : states) {
-            ArrayDeque<State> sameTime = stateByTime.get(s.time);
-            if (sameTime == null) {
-                sameTime = new ArrayDeque<State>();
-                stateByTime.put(s.time, sameTime);
+        boolean doGc = true;
+        for (State s : newActiveStates) {
+            if (s.time < 2 * historyLength) {
+                doGc = false;
+                break;
             }
-            sameTime.push(s);
-            smallestTime = Math.min(smallestTime, s.time);
         }
-        assert historyLength >= 0;
-        int newSmallestTime = Math.max(
-                smallestTime, minActiveTime - historyLength);
-        ArrayDeque<State> oldestStates = stateByTime.get(newSmallestTime);
-        for (State s : oldestStates) {
-            s.parent = null;
-        }
-        for (int t = smallestTime; t < newSmallestTime; ++t) {
-            stateByTime.remove(t);
+        if (doGc) {
+            // Mark those to keep.
+            ArrayDeque<State> p;
+            ArrayDeque<State> q = new ArrayDeque<State>();
+            for (State s : newActiveStates) {
+                q.addLast(s);
+                s.time = -1;
+            }
+            for (int i = 1; i < historyLength; ++i) {
+                p = q;
+                q = new ArrayDeque<State>();
+                for (State s : p) {
+                    if (s.parent != null && s.parent.state.time != -1) {
+                        q.addLast(s.parent.state);
+                        s.parent.state.time = -1;
+                    }
+                }
+            }
+
+            // Update times and cut parent links.
+            for (State s : newActiveStates) {
+                fixTimeOfState(s);
+            }
         }
 
         states = newActiveStates;
-        for (State s : remainActive) {
-            states.add(s);
-        }
         checkerEnabled = true;
     }
     // }}}

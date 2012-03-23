@@ -32,7 +32,7 @@ type method_ =  (* TODO: Use [PropAst.event_tag] instead? *)
     - emit the Java representation of the automaton
   A pattern like "c.m()" in the property matches method m in all classes that
   extend c (including c itself). For efficiency, the Java automaton does not
-  know anything about inheritance. SA.While the bytecode is instrumented all the
+  know anything about inheritance. While the bytecode is instrumented all the
   methods m in classes extending c get unique identifiers and the pattern
   "c.m()" is mapped to the set of those identifiers.
 
@@ -74,6 +74,13 @@ type automaton =
   (* The keys of [pattern_tags] are filled in during the initial conversion,
     but the values (the tag list) is filled in while the code is being
     instrumented. *)
+
+let check_automaton x =
+  let rec is_decreasing x = function
+    | [] -> true
+    | y :: ys -> x >= y && is_decreasing y ys in
+  let ok _ v = assert (is_decreasing max_int v) in
+  Hashtbl.iter ok x.pattern_tags
 
 (* }}} *)
 (* small functions that help handling automata *) (* {{{ *)
@@ -252,7 +259,6 @@ let pq_automaton ioc f x =
   fprintf f "%a@\n" (pq_list (pq_list pp_int)) obs_tags;
   fprintf f "%a@\n" pq_event_names x.event_names
 
-
 let index_constants p =
   let r = Hashtbl.create 13 in (* maps constants to their index *)
   let i = ref (-1) in
@@ -280,6 +286,7 @@ let pq_constants j constants =
   fprintf j "@]@\n}@]"
 
 let generate_checkers out_dir p =
+  check_automaton p;
   let (/) = Filename.concat in
   U.cp_r (Config.src_dir/"topl") out_dir;
   let topl_dir = out_dir/"topl" in
@@ -523,12 +530,11 @@ let does_method_match
 
 let get_tag x =
   let cnt = ref (-1) in fun t (mns, ma) mn ->
-  let fp s p1 p2 acc =
-    let p = s (p1, p2) in
+  let fp p acc =
     let cm mn = does_method_match ({method_name=mn; method_arity=ma}, t) p in
     if List.exists cm mns then p :: acc else acc in
-  if Hashtbl.fold (fp snd) x.observables [] <> [] then begin
-    match Hashtbl.fold (fp fst) x.pattern_tags [] with
+  if U.hashtbl_fold_values fp x.observables [] <> [] then begin
+    match U.hashtbl_fold_keys fp x.pattern_tags [] with
       | [] -> None
       | ps ->
           incr cnt;
@@ -671,7 +677,7 @@ let compute_inheritance in_dir =
       | Some e -> e :: c.BC.implements in
     Hashtbl.replace h name (method_names, parents)
   in
-    ClassMapper.iter in_dir record_class;
+  ClassMapper.iter in_dir record_class;
   h
 
 (* }}} *)

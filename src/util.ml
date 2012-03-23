@@ -46,6 +46,14 @@ let map_with_index f xs =
   let g acc i x = f i x :: acc in
   List.rev (fold_with_index g [] xs)
 
+let hashtbl_fold_keys f h z =
+  let f k _ = f k in
+  Hashtbl.fold f h z
+
+let hashtbl_fold_values f h z =
+  let f _ v = f v in
+  Hashtbl.fold f h z
+
 (** Operators go in a submodule so that we can open it, without having to
 polute the namespace with everything in Util. *)
 module Operators = struct

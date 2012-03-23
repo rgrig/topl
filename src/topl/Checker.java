@@ -587,8 +587,8 @@ public class Checker {
         // of semantics of the automaton, two states that differ in their
         // histories are essentially equivalent.
         // TODO
-        final int generation; // length of list {@code parent}
-        final Parent parent;
+        final int time;
+        Parent parent;
 
         State(int vertex, Treap<Binding> store, Queue<Event> events,
                 Parent parent) {
@@ -596,7 +596,7 @@ public class Checker {
             this.store = store;
             this.events = events;
             this.parent = parent;
-            this.generation = parent == null? 0 : parent.state.generation + 1;
+            this.time = parent == null? 0 : parent.state.time + 1;
         }
 
         @Override
@@ -929,8 +929,15 @@ public class Checker {
         checkerEnabled = true;
     }
 
+    public boolean verbose = false;
+    public int historyLength = 10;
+
     final private Automaton automaton;
     private HashSet<State> states;
+
+    private HashMap<Integer, ArrayDeque<State>> stateByTime =
+        new HashMap<Integer, ArrayDeque<State>>();
+    private int smallestTime = Integer.MAX_VALUE;
 
     public Checker(Automaton automaton) {
         this.automaton = automaton;
@@ -966,9 +973,10 @@ public class Checker {
 
     void reportError(String msg, State errorState) {
         System.err.printf("TOPL: %s\n", msg);
-        System.err.println("TOPL: Error trace:");
-        printErrorTrace(errorState);
-        //System.err.println(errorState);
+        if (verbose) {
+            System.err.println("TOPL: Error trace:");
+            printErrorTrace(errorState);
+        }
     }
 
     public synchronized void check(Event event) {
@@ -987,18 +995,19 @@ public class Checker {
             System.out.printf(" }\n");
             System.out.printf("event %d\n", event.id);
         }
-        HashSet<State> newActiveStates = new HashSet<State>();
+        ArrayDeque<State> remainActive = new ArrayDeque<State>();
+        HashSet<State> newActiveStates = new HashSet<State>(2 * states.size());
         for (State state : states) {
             if (automaton.transitions[state.vertex].length == 0) {
                 continue;
             }
             if (!automaton.isObservable(event.id, state.vertex)) {
-                newActiveStates.add(state);
+                remainActive.add(state);
 		continue;
             }
             state = state.pushEvent(event);
             if (state.events.size() < automaton.maximumTransitionDepths[state.vertex]) {
-                newActiveStates.add(state);
+                remainActive.add(state);
                 continue;
             }
 	    boolean anyEnabled = false;
@@ -1044,7 +1053,39 @@ public class Checker {
                 newActiveStates.add(state.popEvent());
             }
         }
+
+        // Truncate traces.
+        int minActiveTime = Integer.MAX_VALUE;
+        for (State s : remainActive) {
+            minActiveTime = Math.min(minActiveTime, s.time);
+        }
+        for (State s : states) {
+            minActiveTime = Math.min(minActiveTime, s.time);
+        }
+        for (State s : states) {
+            ArrayDeque<State> sameTime = stateByTime.get(s.time);
+            if (sameTime == null) {
+                sameTime = new ArrayDeque<State>();
+                stateByTime.put(s.time, sameTime);
+            }
+            sameTime.push(s);
+            smallestTime = Math.min(smallestTime, s.time);
+        }
+        assert historyLength >= 0;
+        int newSmallestTime = Math.max(
+                smallestTime, minActiveTime - historyLength);
+        ArrayDeque<State> oldestStates = stateByTime.get(newSmallestTime);
+        for (State s : oldestStates) {
+            s.parent = null;
+        }
+        for (int t = smallestTime; t < newSmallestTime; ++t) {
+            stateByTime.remove(t);
+        }
+
         states = newActiveStates;
+        for (State s : remainActive) {
+            states.add(s);
+        }
         checkerEnabled = true;
     }
     // }}}

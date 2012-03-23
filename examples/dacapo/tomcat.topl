@@ -1,5 +1,6 @@
-property ForwardOnlyUncommittedResponses
-  // TODO assume ResponseUsesEitherWriterOrStream
+property ForwardUncommitted
+  message "A ServletResponse was forwarded before being committed."
+  // TODO assume InterleavedResponse_Weak
   observe <javax.servlet.{ServletOutputStream,ServletResponse}.*>
   observe <java.io.PrintWriter.flush>
   prefix <javax.servlet>
@@ -14,11 +15,37 @@ property ForwardOnlyUncommittedResponses
   gotStream -> ok: s.flush(), r.flushBuffer()
   tracking -> error: call *.<RequestDispatcher.forward>(*, r)
 
-property ResponseUsesEitherWriterOrStream
+// The documentation of ServletResponse.getOutputStream says that "either this
+// method getWriter may be called to write to the body, not both." So,
+// technically, the property is InterleavedResponse1. However, this property is
+// broken, which is why we also have the weaker version InterleavedResponse2.
+property InterleavedResponse1
+  message "A ServletResponse was asked for both a writer and a stream."
   observe <javax.servlet.ServletResponse.{getOutputStream,getWriter}>
   prefix <javax.servlet.ServletResponse>
   start -> start: *
-  start -> gotWriter: R.getWriter()
-  start -> gotStream: R.getOutputStream()
-  gotWriter -> error: call r.getOutputStream()
-  gotStream -> error: call r.getWriter()
+  start -> gotWriter: W := R.getWriter()
+  start -> gotStream: S := R.getOutputStream()
+  gotWriter -> error: r.getOutputStream()
+  gotStream -> error: r.getWriter()
+
+property InterleavedResponse2
+  // vertex names: w = got writer; W = used writer; similarly for s, S
+  message "Incompatible methods for putting data into a response were used."
+  observe <javax.servlet.ServletOutputStream.*>
+  observe <java.io.PrintWriter.*>
+  observe <javax.servlet.ServletResponse.{getOutputStream,getWriter}>
+  prefix <javax.servlet.ServletResponse>
+  start -> start: *
+  start -> w: W := R.getWriter()
+  start -> s: S := R.getOutputStream()
+  w -> sw: S := r.getOutputStream()
+  s -> sw: W := r.getWriter()
+  w -> W: w.*
+  sw -> sW: w.*
+  s -> S: s.*
+  sw -> Sw: s.*
+  W -> sW: r.getOutputStream()
+  S -> Sw: r.getWriter()
+  sW -> error: s.*
+  Sw -> error: w.*

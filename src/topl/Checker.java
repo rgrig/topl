@@ -1221,6 +1221,21 @@ public class Checker {
     }
     // }}}
     // debug {{{
+    private String eventIdsToString(Set<Integer> eventIds) {
+        StringBuilder sb = new StringBuilder();
+        sb.append('[');
+	boolean later = false;
+        for (Integer id : eventIds) {
+	    if (later) {
+		sb.append(", ");
+	    }
+            sb.append(automaton.eventNames[id]);
+	    later = true;
+        }
+        sb.append("]");
+	return sb.toString();
+    }
+
     public String toDOT(int cap) {
 	StringBuffer s = new StringBuffer();
 	s.append("digraph Property {\n");
@@ -1252,7 +1267,7 @@ public class Checker {
 		s.append(transition.target);
 		s.append(" [label=\"");
 		for (TransitionStep step : transition.steps) {
-		    s.append(cap <= 0 || step.eventIds.size() <= cap ? step.eventIds.toString() : "[" + step.eventIds.size() + " ids (>" + cap + ")]");
+		    s.append(cap <= 0 || step.eventIds.size() <= cap ? eventIdsToString(step.eventIds) : "[" + step.eventIds.size() + " ids (>" + cap + ")]");
 		    s.append(step.guard.toString());
 		    s.append("<");
 		    for(Map.Entry a : step.action.assignments.entrySet()) {

@@ -1224,7 +1224,7 @@ public class Checker {
 	    s.append("  S_");
 	    s.append(i);
 	    s.append(" [label=\"");
-	    s.append(i);
+	    s.append(automaton.vertexNames[i]);
 	    if (automaton.errorMessages[i] != null) {
 		s.append(" : ");
 		s.append(automaton.errorMessages[i]);

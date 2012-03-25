@@ -852,7 +852,10 @@ public class Checker {
 
 	public int[] maximumTransitionDepths;
             // {maximumTransitionDepths[vertex]} is the maximum depths of outgoing transitions of {vertex}
+
         final String[] eventNames;
+
+        final String[] vertexNames;
 
 	/**
 	 * @param startVertices startVertices[p] has start vertex for property p
@@ -863,12 +866,13 @@ public class Checker {
 	 */
         Automaton(int[] startVertices, String[] errorMessages,
                   Transition[][] transitions, int[] filterOfState,
-                  int[][] filters, String[] eventNames) {
+                  int[][] filters, String[] eventNames, String[] vertexNames) {
             this.startVertices = startVertices;
             this.errorMessages = errorMessages;
             this.filterOfState = filterOfState;
             this.transitions = transitions;
             this.eventNames = eventNames;
+            this.vertexNames = vertexNames;
 	    maximumTransitionDepths = new int[transitions.length];
             for (int s = 0; s < transitions.length; ++s) {
 		maximumTransitionDepths[s] = 0;
@@ -952,14 +956,18 @@ public class Checker {
         System.err.println(sb.toString());
     }
 
+    void printErrorState(State errorState) {
+        System.err.println(automaton.vertexNames[errorState.vertex]);
+    }
+
     void printErrorTrace(State errorState) {
         if (errorState.parent != null) {
-	    printErrorTrace(errorState.parent.state);
-	    System.err.println("\n---- via events ----");
-	    printEventQueue(errorState.parent.events);
-	    System.err.println("\n--- got to state ---");
-	}
-        System.err.println(errorState.vertex);
+            printErrorTrace(errorState.parent.state);
+            System.err.println("\n---- via events ----");
+            printEventQueue(errorState.parent.events);
+            System.err.println("\n--- got to state ---");
+        }
+        printErrorState(errorState);
     }
 
     void reportError(String msg, State errorState) {
@@ -1132,8 +1140,12 @@ public class Checker {
                 int index = scan.nextInt();
                 eventNames[index] = scan.next();
             }
+	    String[] vertexNames = new String[scan.nextInt()];
+            for (int i = 0; i < eventNames.length; ++i) {
+                vertexNames[i] = scan.next();
+            }
             return new Automaton(startVertices, errorMessages, transitions,
-                                 filterOfState, filters, eventNames);
+                                 filterOfState, filters, eventNames, vertexNames);
         }
 
         Transition[] vertex() {

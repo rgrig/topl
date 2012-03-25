@@ -248,6 +248,10 @@ let pq_event_names f pns =
   fprintf f "%d " (Hashtbl.length pns);
   Hashtbl.iter (pq_event_name f) pns
 
+(* TODO: consider separator *)
+let pq_vertex_name f v =
+  fprintf f " %s" v.vertex_name
+
 let pq_automaton ioc f x =
   let pov = compute_pov x in
   let obs_p p = Hashtbl.find x.pattern_tags (Hashtbl.find x.observables p) in
@@ -257,7 +261,8 @@ let pq_automaton ioc f x =
   fprintf f "%a@\n" (pq_array (pq_vertex x.pattern_tags ioc)) x.vertices;
   fprintf f "%a@\n" (pq_array pp_int) pov;
   fprintf f "%a@\n" (pq_list (pq_list pp_int)) obs_tags;
-  fprintf f "%a@\n" pq_event_names x.event_names
+  fprintf f "%a@\n" pq_event_names x.event_names;
+  fprintf f "%a@\n" (pq_array pq_vertex_name) x.vertices
 
 let index_constants p =
   let r = Hashtbl.create 13 in (* maps constants to their index *)

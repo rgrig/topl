@@ -947,8 +947,13 @@ public class Checker {
         sb.append('<');
         for (Event e : events) {
             sb.append(" " + automaton.eventNames[e.id] + "(");
+	    boolean later = false;
             for(Object o : e.values) {
+		if (later) {
+                    sb.append(", ");
+                }
                 sb.append(o.toString());
+                later = true;
             }
             sb.append(")");
         }

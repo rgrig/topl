@@ -281,7 +281,7 @@ module PropertyChecks = struct
   let error_edge msg e vs = match U.StringSet.elements vs with
     | [] -> ()
     | vs ->
-        U.pp_list ", " U.pp_s str_formatter vs;
+        U.pp_list ", " U.pp_string str_formatter vs;
         fprintf str_formatter " on edge %s->%s" e.PA.source e.PA.target;
         error !location msg (flush_str_formatter ())
 

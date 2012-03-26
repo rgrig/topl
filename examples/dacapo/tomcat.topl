@@ -14,6 +14,8 @@ property ForwardUncommitted
   tracking -> gotStream: S := r.getOutputStream()
   gotStream -> ok: s.flush(), r.flushBuffer()
   tracking -> error: call *.<RequestDispatcher.forward>(*, r)
+  gotWriter -> error: call *.<RequestDispatcher.forward>(*, r)
+  gotStream -> error: call *.<RequestDispatcher.forward>(*, r)
 
 // The documentation of ServletResponse.getOutputStream says that "either this
 // method getWriter may be called to write to the body, not both." So,

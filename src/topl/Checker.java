@@ -1298,7 +1298,6 @@ public class Checker {
 /* TODO {{{
     - do *NOT* use any Java libraries
     - write some tests
-    - report traces when something goes wrong
     - add 'final' where possible
 }}} */
 // vim:sts=4:sw=4:ts=8:et:

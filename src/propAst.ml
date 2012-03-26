@@ -9,6 +9,11 @@ type 'a with_line = { ast : 'a; line : int }
 
 type vertex = string
 
+(* p_str = Str.regexp p_re *)
+type pattern =
+  { p_re : Str.regexp
+  ; p_string : string }
+
 type ('variable, 'value) value_guard =
   | Variable of 'variable * int
   | Constant of 'value * int
@@ -66,10 +71,16 @@ type ('method_name, 'variable, 'value) transition =
 type ('variable, 'value) t =
   { name : string
   ; message : string
-  ; observable : Str.regexp
-  ; transitions: (Str.regexp, 'variable, 'value) transition list }
+  ; observable : pattern
+  ; transitions: (pattern, 'variable, 'value) transition list }
 (* }}} *)
 (* utilities *) (* {{{ *)
+let mk_pattern s =
+  { p_re = Str.regexp s; p_string = s }
+
+let pattern_matches p s =
+  Str.string_match p.p_re s 0
+
 let wvars l =
   List.map fst l.action
 
@@ -114,11 +125,16 @@ let get_value_guards p =
   let gs = guards_of_automaton p in
   List.concat (List.map (fun x -> x.value_guards) gs)
 
+let pp_event_type f = function
+  | Call -> fprintf f "call"
+  | Return -> fprintf f "return"
+
+(* TODO(rgrig): remove? *)
 let ok_automaton =
   { name = "AlwaysOk"
   ; message =
       "internal error: ok_automaton should be happy with all programs"
-  ; observable = Str.regexp "^$"
+  ; observable = mk_pattern "^$"
   ; transitions = [] }
 
 (* }}} *)

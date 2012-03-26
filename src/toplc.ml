@@ -49,7 +49,7 @@ type method_ =  (* TODO: Use [PropAst.event_tag] instead? *)
 
 (* shorthands for old types, those that come from prop.mly *)
 type property = (string, string) PA.t
-type tag_guard = Str.regexp PA.tag_guard
+type tag_guard = PA.pattern PA.tag_guard
 
 (* shorthands for new types, those used in Java *)
 type tag = int
@@ -58,7 +58,7 @@ type variable = int
 type value = string (* Java literal *)
 
 type transition =
-  { steps : (Str.regexp, variable, value) PA.label list
+  { steps : (PA.pattern, variable, value) PA.label list
   ; target : vertex }
 
 type vertex_data =
@@ -109,6 +109,7 @@ let get_variables p =
 
 (* }}} *)
 (* pretty printing to Java *) (* {{{ *)
+(* TODO(rgrig): Most of these are unused and should be removed. *)
 
 let array_foldi f z xs =
   let r = ref z in
@@ -220,6 +221,8 @@ let pq_value_guard ioc f = function
   | PA.Constant (c, i) -> fprintf f "1 %d %a" i (pq_string ioc) c
 
 let pq_pattern tags f p =
+  if log_dbg then
+    printf "@\n@[len(tags) %d@]" (List.length (Hashtbl.find tags p));
   fprintf f "%a" (pq_list pp_int) (Hashtbl.find tags p)
 
 let pq_condition ioc = pq_list (pq_value_guard ioc)
@@ -352,9 +355,9 @@ let transform_properties ps =
     ; outgoing_transitions = [] } in
   let full_p =
     { vertices = inverse_index mk_vd iov
-    ; observables = Hashtbl.create 13
-    ; pattern_tags = Hashtbl.create 13
-    ; event_names = Hashtbl.create 13 } in
+    ; observables = Hashtbl.create 0
+    ; pattern_tags = Hashtbl.create 0
+    ; event_names = Hashtbl.create 0 } in
   let add_obs_tags p =
     let obs_tag =
       { PA.event_type = None
@@ -364,15 +367,18 @@ let transform_properties ps =
     Hashtbl.replace full_p.observables p obs_tag in
   List.iter add_obs_tags ps;
   let add_transition vi t =
-    let ts = full_p.vertices.(vi).outgoing_transitions in
-    full_p.vertices.(vi) <- {full_p.vertices.(vi) with outgoing_transitions = t :: ts} in
-  let ifv = Hashtbl.create 101 in (* variable, string -> integer *)
+    let vs = full_p.vertices in
+    let ts = vs.(vi).outgoing_transitions in
+    vs.(vi) <- { vs.(vi) with outgoing_transitions = t :: ts } in
+  let ifv = Hashtbl.create 0 in (* variable, string -> integer *)
   let pe p {PA.source=s;PA.target=t;PA.labels=ls} =
     let s = Hashtbl.find iov (p, s) in
     let t = Hashtbl.find iov (p, t) in
     let ls = List.map (transform_label ifv full_p.pattern_tags) ls in
     add_transition s {steps=ls; target=t} in
   List.iter (fun p -> List.iter (pe p) p.PA.transitions) ps;
+  if log_dbg then
+    printf "@\n@[len(pattern_tags) %d@]" (Hashtbl.length full_p.pattern_tags);
   full_p
 
 (* }}} *)
@@ -528,10 +534,15 @@ let does_method_match
 =
   let ba = U.option true ((=) ma) a in
   let bt = U.option true ((=) mt) t in
-  let bn = Str.string_match re mn 0 in
-  if ba && bt && bn && log_cp then printf "@\n@[match %s@]" mn;
-(*    printf "@[(%s, %d) matches: mn: %b, ma: %b, mt: %b@." mn ma bn ba bt; *)
-    ba && bt && bn
+  let bn = PA.pattern_matches re mn in
+  let r = ba && bt && bn in
+  if log_mm then begin
+    printf "@\n@[%s " (if r then "✓" else "x");
+    printf "(%a, %s, %d) matches (%a, %s, %a)@]"
+      PA.pp_event_type mt mn ma
+      (U.pp_option PA.pp_event_type) t re.PA.p_string (U.pp_option U.pp_int) a
+  end;
+  ba && bt && bn
 
 let get_tag x =
   let string_of_method mn = function
@@ -634,19 +645,23 @@ let instrument_code call_id return_id param_types return_types code =
   put_labels_on bc_send_call_event @
   (add_return_code bc_send_ret_event code)
 
-let rec get_ancestors h m c =
-  try
-    let ms, parents = Hashtbl.find h c in
-    let here = if List.mem m ms then [c] else [] in
-    here @ (parents >>= get_ancestors h m)
-  with Not_found -> []
+let rec get_ancestors h c =
+  let cs = Hashtbl.create 0 in
+  let rec ga c =
+    if not (Hashtbl.mem cs c) then begin
+      Hashtbl.add cs c ();
+      let parents = try Hashtbl.find h c with Not_found -> [] in
+      List.iter ga parents
+    end in
+  ga c;
+  U.hashtbl_fold_keys (fun c cs -> c :: cs) cs []
 
-let get_overrides h c ({method_name=n; method_arity=a} as m) =
-  let ancestors = get_ancestors h m c in
+let get_overrides h c m =
+  let ancestors = get_ancestors h c in
   let uts = B.Utils.UTF8.to_string in
   let cts c = uts (B.Name.external_utf8_for_class c) in
-  let qualify c =  (cts c) ^ "." ^ n in
-  (List.map qualify ancestors, a)
+  let qualify c =  (cts c) ^ "." ^ m.method_name in
+  (List.map qualify ancestors, m.method_arity)
 
 let raise_stack n x =
   B.Utils.u2 ((x : B.Utils.u2 :> int) + n)
@@ -673,17 +688,15 @@ let instrument_class get_tags h c =
   if log_cp then printf "@\n@[<2>begin instrument %a" pp_class c;
   let instrumented_methods = List.map (instrument_method get_tags h c.BC.name) c.BC.methods in
   if log_cp then printf "@]@\nend instrument %a@\n" pp_class c;
-    {c with BC.methods = instrumented_methods}
+  {c with BC.methods = instrumented_methods}
 
 let compute_inheritance in_dir =
-  let h = Hashtbl.create 101 in
+  let h = Hashtbl.create 0 in
   let record_class c =
-    let name = c.BC.name in
-    let method_names = List.map mk_method c.BC.methods in
     let parents = match c.BC.extends with
       | None -> c.BC.implements
       | Some e -> e :: c.BC.implements in
-    Hashtbl.replace h name (method_names, parents)
+    Hashtbl.replace h c.BC.name parents
   in
   ClassMapper.iter in_dir record_class;
   h

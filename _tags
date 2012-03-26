@@ -8,4 +8,4 @@ true: use_menhir
 <src/*.mly>: explain
 true: annot
 true: debug
-#true: profile # slow
+#true: profile

@@ -534,6 +534,9 @@ let does_method_match
     ba && bt && bn
 
 let get_tag x =
+  let string_of_method mn = function
+    | PA.Call -> "Call_" ^ mn
+    | PA.Return -> "Return_" ^ mn in
   let cnt = ref (-1) in fun t (mns, ma) mn ->
   let fp p acc =
     let cm mn = does_method_match ({method_name=mn; method_arity=ma}, t) p in
@@ -547,7 +550,7 @@ let get_tag x =
             let ts = Hashtbl.find x.pattern_tags p in
             (* printf "added tag %d\n" !cnt; *)
             Hashtbl.replace x.pattern_tags p (!cnt :: ts);
-            Hashtbl.replace x.event_names !cnt mn in
+            Hashtbl.replace x.event_names !cnt (string_of_method mn t) in
           List.iter at ps;
           Some !cnt
   end else None

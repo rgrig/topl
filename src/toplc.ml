@@ -530,12 +530,13 @@ let does_method_match
   let ba = U.option true ((=) ma) a in
   let bt = U.option true ((=) mt) t in
   let bn = PA.pattern_matches re mn in
-  if log_dbg then begin
-    printf "@\n@[(%a, %s, %d) in? (%a, %s, %a)@]"
+  let r = ba && bt && bn in
+  if log_mm then begin
+    printf "@\n@[%s " (if r then "✓" else "x");
+    printf "(%a, %s, %d) matches (%a, %s, %a)@]"
       PA.pp_event_type mt mn ma
       (U.pp_option PA.pp_event_type) t re.PA.p_string (U.pp_option U.pp_int) a
   end;
-  if ba && bt && bn && log_cp then printf "@\n@[match %s@]" mn;
   ba && bt && bn
 
 let get_tag x =
@@ -636,19 +637,23 @@ let instrument_code call_id return_id param_types return_types code =
   put_labels_on bc_send_call_event @
   (add_return_code bc_send_ret_event code)
 
-let rec get_ancestors h m c =
-  try
-    let ms, parents = Hashtbl.find h c in
-    let here = if List.mem m ms then [c] else [] in
-    here @ (parents >>= get_ancestors h m)
-  with Not_found -> []
+let rec get_ancestors h c =
+  let cs = Hashtbl.create 0 in
+  let rec ga c =
+    if not (Hashtbl.mem cs c) then begin
+      Hashtbl.add cs c ();
+      let parents = try Hashtbl.find h c with Not_found -> [] in
+      List.iter ga parents
+    end in
+  ga c;
+  U.hashtbl_fold_keys (fun c cs -> c :: cs) cs []
 
-let get_overrides h c ({method_name=n; method_arity=a} as m) =
-  let ancestors = get_ancestors h m c in
+let get_overrides h c m =
+  let ancestors = get_ancestors h c in
   let uts = B.Utils.UTF8.to_string in
   let cts c = uts (B.Name.external_utf8_for_class c) in
-  let qualify c =  (cts c) ^ "." ^ n in
-  (List.map qualify ancestors, a)
+  let qualify c =  (cts c) ^ "." ^ m.method_name in
+  (List.map qualify ancestors, m.method_arity)
 
 let raise_stack n x =
   B.Utils.u2 ((x : B.Utils.u2 :> int) + n)
@@ -675,17 +680,15 @@ let instrument_class get_tags h c =
   if log_cp then printf "@\n@[<2>begin instrument %a" pp_class c;
   let instrumented_methods = List.map (instrument_method get_tags h c.BC.name) c.BC.methods in
   if log_cp then printf "@]@\nend instrument %a@\n" pp_class c;
-    {c with BC.methods = instrumented_methods}
+  {c with BC.methods = instrumented_methods}
 
 let compute_inheritance in_dir =
-  let h = Hashtbl.create 101 in
+  let h = Hashtbl.create 0 in
   let record_class c =
-    let name = c.BC.name in
-    let method_names = List.map mk_method c.BC.methods in
     let parents = match c.BC.extends with
       | None -> c.BC.implements
       | Some e -> e :: c.BC.implements in
-    Hashtbl.replace h name (method_names, parents)
+    Hashtbl.replace h c.BC.name parents
   in
   ClassMapper.iter in_dir record_class;
   h

@@ -83,7 +83,9 @@ let add_ints s = List.fold_left (flip IntSet.add) s
 
 let add_strings s = List.fold_left (flip StringSet.add) s
 
-let pp_s pp_f s = fprintf pp_f "%s" s
+let pp_string f s = fprintf f "%s" s
+
+let pp_int f x = fprintf f "%d" x
 
 let pp_list pp_sep pp_element =
   let rec f = fun pp_f -> function
@@ -94,7 +96,7 @@ let pp_list pp_sep pp_element =
 
 let pp_option pp_e ppf = function
   | None -> fprintf ppf "None"
-  | Some s -> fprintf ppf "Some %a" pp_e s
+  | Some s -> fprintf ppf "Some(%a)" pp_e s
 
 let rec fix f x =
   let y = f x in

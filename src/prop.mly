@@ -45,16 +45,21 @@
     end done;
     if !c <> 0 then e (); (* syntax error *)
     let r = Buffer.contents r in
-(*    printf "@[HERE: '%s' -> '%s'@." g r; *)
-     r
+    if log_re then printf "@[RE '%s' -> '%s'@." g r;
+    r
 
   let mk_args_pattern a ps =
     { PA.tag_guard =
       { PA.event_type = None
       ; PA.method_name = ".*"
-      ; PA.method_arity = match a with None -> None | Some x -> Some (succ x) }
-        (* count the receiver *)
+      ; PA.method_arity = a }
     ; PA.value_guards = ps }
+
+  let prepend_arg_guard g p =
+    let io = function None -> None | Some x -> Some (succ x) in
+    let ia g = { g with PA.method_arity = io g.PA.method_arity } in
+    { PA.value_guards = g :: p.PA.value_guards
+    ; PA.tag_guard = ia p.PA.tag_guard }
 
   let any_tag_guard =
     { PA.tag_guard =
@@ -122,15 +127,15 @@
   let mk_property e n xs =
     let m, o, p, t = split_items xs in
     let p = prefix_of_list p in
-    let pm m = Str.regexp (sprintf "^%s%s$" p m) in
+    let pm m = PA.mk_pattern (sprintf "^%s%s$" p m) in
     let ptg tg = { tg with PA.method_name = pm tg.PA.method_name } in
     let pg g = { g with PA.tag_guard = ptg g.PA.tag_guard } in
     let pl l = { l with PA.guard = pg l.PA.guard } in
     let pt t = { t with PA.labels = List.map pl t.PA.labels } in
     { PA.name = n
     ; PA.message = extract_message e n m
-    ; PA.observable = Str.regexp
-        (fprintf str_formatter "%a$" pp_or_re o; flush_str_formatter ())
+    ; PA.observable = PA.mk_pattern
+        (fprintf str_formatter "^%a$" pp_or_re o; flush_str_formatter ())
     ; PA.transitions = List.map pt (List.concat t) }
 
 %}
@@ -172,14 +177,14 @@ big_label:
       { mk_label None g [v] g.PA.value_guards }
 
 label_rhs(ValuePattern):
-    v=ValuePattern DOT m=method_pattern(ValuePattern)
-      { { m with PA.value_guards = v :: m.PA.value_guards } }
+    v=ValuePattern DOT m=method_pattern(ValuePattern) { prepend_arg_guard v m }
+  | v=ValuePattern DOT STAR { prepend_arg_guard v any_tag_guard }
+  | m=method_pattern(ValuePattern) { m }
   | STAR { any_tag_guard }
 
 method_pattern(ValuePattern):
     m=string_pattern x=args_pattern(ValuePattern)
       { { x with PA.tag_guard = { x.PA.tag_guard with PA.method_name = m } } }
-  | STAR { any_tag_guard }
 
 args_pattern(ValuePattern):
     LB a=integer_pattern RB

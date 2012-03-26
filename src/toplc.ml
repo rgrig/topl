@@ -49,7 +49,7 @@ type method_ =  (* TODO: Use [PropAst.event_tag] instead? *)
 
 (* shorthands for old types, those that come from prop.mly *)
 type property = (string, string) PA.t
-type tag_guard = Str.regexp PA.tag_guard
+type tag_guard = PA.pattern PA.tag_guard
 
 (* shorthands for new types, those used in Java *)
 type tag = int
@@ -58,7 +58,7 @@ type variable = int
 type value = string (* Java literal *)
 
 type transition =
-  { steps : (Str.regexp, variable, value) PA.label list
+  { steps : (PA.pattern, variable, value) PA.label list
   ; target : vertex }
 
 type vertex_data =
@@ -109,6 +109,7 @@ let get_variables p =
 
 (* }}} *)
 (* pretty printing to Java *) (* {{{ *)
+(* TODO(rgrig): Most of these are unused and should be removed. *)
 
 let array_foldi f z xs =
   let r = ref z in
@@ -220,6 +221,8 @@ let pq_value_guard ioc f = function
   | PA.Constant (c, i) -> fprintf f "1 %d %a" i (pq_string ioc) c
 
 let pq_pattern tags f p =
+  if log_dbg then
+    printf "@\n@[len(tags) %d@]" (List.length (Hashtbl.find tags p));
   fprintf f "%a" (pq_list pp_int) (Hashtbl.find tags p)
 
 let pq_condition ioc = pq_list (pq_value_guard ioc)
@@ -347,9 +350,9 @@ let transform_properties ps =
     ; outgoing_transitions = [] } in
   let full_p =
     { vertices = inverse_index mk_vd iov
-    ; observables = Hashtbl.create 13
-    ; pattern_tags = Hashtbl.create 13
-    ; event_names = Hashtbl.create 13 } in
+    ; observables = Hashtbl.create 0
+    ; pattern_tags = Hashtbl.create 0
+    ; event_names = Hashtbl.create 0 } in
   let add_obs_tags p =
     let obs_tag =
       { PA.event_type = None
@@ -359,15 +362,18 @@ let transform_properties ps =
     Hashtbl.replace full_p.observables p obs_tag in
   List.iter add_obs_tags ps;
   let add_transition vi t =
-    let ts = full_p.vertices.(vi).outgoing_transitions in
-    full_p.vertices.(vi) <- {full_p.vertices.(vi) with outgoing_transitions = t :: ts} in
-  let ifv = Hashtbl.create 101 in (* variable, string -> integer *)
+    let vs = full_p.vertices in
+    let ts = vs.(vi).outgoing_transitions in
+    vs.(vi) <- { vs.(vi) with outgoing_transitions = t :: ts } in
+  let ifv = Hashtbl.create 0 in (* variable, string -> integer *)
   let pe p {PA.source=s;PA.target=t;PA.labels=ls} =
     let s = Hashtbl.find iov (p, s) in
     let t = Hashtbl.find iov (p, t) in
     let ls = List.map (transform_label ifv full_p.pattern_tags) ls in
     add_transition s {steps=ls; target=t} in
   List.iter (fun p -> List.iter (pe p) p.PA.transitions) ps;
+  if log_dbg then
+    printf "@\n@[len(pattern_tags) %d@]" (Hashtbl.length full_p.pattern_tags);
   full_p
 
 (* }}} *)
@@ -523,10 +529,14 @@ let does_method_match
 =
   let ba = U.option true ((=) ma) a in
   let bt = U.option true ((=) mt) t in
-  let bn = Str.string_match re mn 0 in
+  let bn = PA.pattern_matches re mn in
+  if log_dbg then begin
+    printf "@\n@[(%a, %s, %d) in? (%a, %s, %a)@]"
+      PA.pp_event_type mt mn ma
+      (U.pp_option PA.pp_event_type) t re.PA.p_string (U.pp_option U.pp_int) a
+  end;
   if ba && bt && bn && log_cp then printf "@\n@[match %s@]" mn;
-(*    printf "@[(%s, %d) matches: mn: %b, ma: %b, mt: %b@." mn ma bn ba bt; *)
-    ba && bt && bn
+  ba && bt && bn
 
 let get_tag x =
   let cnt = ref (-1) in fun t (mns, ma) mn ->

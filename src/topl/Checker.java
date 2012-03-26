@@ -121,7 +121,7 @@ public class Checker {
             }
             sb.append(" >");
             return sb.toString();
-	}
+        }
     }
     /*
     static class Queue<T> implements Iterable<T> {
@@ -407,7 +407,7 @@ public class Checker {
 
         Treap<T> remove(T oldData) {
             if (logTreap) {
-	        System.out.println("Removing " + oldData);
+                System.out.println("Removing " + oldData);
             }
             Treap<T> result = this;
             if (data != null) {
@@ -461,12 +461,12 @@ public class Checker {
         }
 
         // Used mostly for debugging.
-	public int size() {
-	    int s = data == null? 0 : 1;
-	    if (left != null) s += left.size();
-	    if (right != null) s += right.size();
-	    return s;
-	}
+        public int size() {
+            int s = data == null? 0 : 1;
+            if (left != null) s += left.size();
+            if (right != null) s += right.size();
+            return s;
+        }
 
         @Override
         public int hashCode() {
@@ -500,9 +500,9 @@ public class Checker {
     // }}}
     // helper functions {{{
     private static boolean valueEquals(Object o1, Object o2) {
-	if (o1 instanceof Integer)
-	    return o1.equals(o2);
-	return o1 == o2;
+        if (o1 instanceof Integer)
+            return o1.equals(o2);
+        return o1 == o2;
     }
 
     // TODO(rgrig): Might want to produce a set with a faster {contains}
@@ -630,7 +630,7 @@ public class Checker {
             return new State(vertex, store, events.pop(), parent);
         }
 
-	public String toString () {
+        public String toString () {
             StringBuilder sb = new StringBuilder();
             sb.append("Verttex: " + vertex);
             sb.append("\nStore:\n" + store);
@@ -664,20 +664,20 @@ public class Checker {
             return true;
         }
 
-	@Override
-	public String toString() {
-	    if (children.length == 0) return "*";
-	    if (children.length == 1) return children[0].toString();
-	    StringBuffer s = new StringBuffer();
-	    s.append("and (");
-	    for (Guard g : children) {
-		s.append(g);
-		s.append(", ");
+        @Override
+        public String toString() {
+            if (children.length == 0) return "*";
+            if (children.length == 1) return children[0].toString();
+            StringBuffer s = new StringBuffer();
+            s.append("and (");
+            for (Guard g : children) {
+                s.append(g);
+                s.append(", ");
             }
-	    s.delete(s.length()-2, s.length());
-	    s.append(")");
-	    return s.toString();
-	}
+            s.delete(s.length()-2, s.length());
+            s.append(")");
+            return s.toString();
+        }
     }
 
     static class NotGuard implements Guard {
@@ -692,10 +692,10 @@ public class Checker {
             return !child.evaluate(event, store);
         }
 
-	@Override
-	public String toString() {
-	    return "not (" + child + ")";
-	}
+        @Override
+        public String toString() {
+            return "not (" + child + ")";
+        }
     }
 
     static class StoreEqualityGuard implements Guard {
@@ -709,18 +709,18 @@ public class Checker {
 
         @Override
         public boolean evaluate(Event event, Treap<Binding> store) {
-	    Binding b = new Binding(storeIndex);
-	    boolean eq = valueEquals(event.values[eventIndex], store.get(b).value);
+            Binding b = new Binding(storeIndex);
+            boolean eq = valueEquals(event.values[eventIndex], store.get(b).value);
             if (logGuard) {
-	        System.out.println(eq ? "matches store" : "does NOT match store");
+                System.out.println(eq ? "matches store" : "does NOT match store");
             }
             return eq;
         }
 
-	@Override
-	public String toString() {
-	    return "event[" + eventIndex + "] == store[" + storeIndex + "]";
-	}
+        @Override
+        public String toString() {
+            return "event[" + eventIndex + "] == store[" + storeIndex + "]";
+        }
     }
 
     static class ConstantEqualityGuard implements Guard {
@@ -739,10 +739,10 @@ public class Checker {
                 valueEquals(value, event.values[eventIndex]);
         }
 
-	@Override
-	public String toString() {
-	    return value + " == event[" + eventIndex + "]";
-	}
+        @Override
+        public String toString() {
+            return value + " == event[" + eventIndex + "]";
+        }
     }
 
     static class TrueGuard implements Guard {
@@ -751,10 +751,10 @@ public class Checker {
             return true;
         }
 
-	@Override
-	public String toString() {
-	    return "*";
-	}
+        @Override
+        public String toString() {
+            return "*";
+        }
     }
 
     static class Action {
@@ -826,21 +826,21 @@ public class Checker {
                 this.vertex = vertex;
                 this.eventId = eventId;
             }
-	    @Override
+            @Override
             public boolean equals(Object o) {
-		if (o instanceof VertexEvent) {
-		    VertexEvent ve = (VertexEvent)o;
-		    return (vertex == ve.vertex && eventId == ve.eventId);
-		}
-		else return false;
-	    }
-	    @Override
-	    public int hashCode() {
-		return 31*vertex + 101*eventId;
-	    }
+                if (o instanceof VertexEvent) {
+                    VertexEvent ve = (VertexEvent)o;
+                    return (vertex == ve.vertex && eventId == ve.eventId);
+                }
+                else return false;
+            }
+            @Override
+            public int hashCode() {
+                return 31*vertex + 101*eventId;
+            }
         }
-	private boolean[][] observable;
-	   // {observable[p][e]} is on iff property {p} observes event {e}
+        private boolean[][] observable;
+           // {observable[p][e]} is on iff property {p} observes event {e}
 
         final int[] startVertices;
         final String[] errorMessages;
@@ -850,20 +850,20 @@ public class Checker {
         final Transition[][] transitions;
             // {transitions[vertex]} are the outgoing transitions of {vertex}
 
-	public int[] maximumTransitionDepths;
+        public int[] maximumTransitionDepths;
             // {maximumTransitionDepths[vertex]} is the maximum depths of outgoing transitions of {vertex}
 
         final String[] eventNames;
 
         final String[] vertexNames;
 
-	/**
-	 * @param startVertices startVertices[p] has start vertex for property p
-	 * @param erorMessages erorMessages[i] is null if vertex i is not accepting
-	 * @param transitions transitions[i][j] is transtion from vertex i to vertex j
-	 * @param filterOfState filterOfState[i] is the property that vertex i belongs to
-	 * @param filters filters[p][n] is the event id of the n'th event that property p observes
-	 */
+        /**
+         * @param startVertices startVertices[p] has start vertex for property p
+         * @param erorMessages erorMessages[i] is null if vertex i is not accepting
+         * @param transitions transitions[i][j] is transtion from vertex i to vertex j
+         * @param filterOfState filterOfState[i] is the property that vertex i belongs to
+         * @param filters filters[p][n] is the event id of the n'th event that property p observes
+         */
         Automaton(int[] startVertices, String[] errorMessages,
                   Transition[][] transitions, int[] filterOfState,
                   int[][] filters, String[] eventNames, String[] vertexNames) {
@@ -873,26 +873,26 @@ public class Checker {
             this.transitions = transitions;
             this.eventNames = eventNames;
             this.vertexNames = vertexNames;
-	    maximumTransitionDepths = new int[transitions.length];
+            maximumTransitionDepths = new int[transitions.length];
             for (int s = 0; s < transitions.length; ++s) {
-		maximumTransitionDepths[s] = 0;
-		for (Transition t : transitions[s]) {
-		    maximumTransitionDepths[s] = Math.max(
+                maximumTransitionDepths[s] = 0;
+                for (Transition t : transitions[s]) {
+                    maximumTransitionDepths[s] = Math.max(
                                 maximumTransitionDepths[s], t.steps.length);
-		}
+                }
             }
-	    int maxEvent = 0;
-	    for (int[] f : filters) {
-		for (int e : f) {
-		    if (e > maxEvent) maxEvent = e;
-		}
-	    }
-	    observable = new boolean[filters.length][maxEvent + 1];
-	    for (int f = 0; f < filters.length; f++) {
-		for (int e = 0; e < maxEvent; e++) {
-		    observable[f][e] = true;
-		}
-	    }
+            int maxEvent = 0;
+            for (int[] f : filters) {
+                for (int e : f) {
+                    if (e > maxEvent) maxEvent = e;
+                }
+            }
+            observable = new boolean[filters.length][maxEvent + 1];
+            for (int f = 0; f < filters.length; f++) {
+                for (int e = 0; e < maxEvent; e++) {
+                    observable[f][e] = true;
+                }
+            }
             assert check();
         }
 
@@ -922,7 +922,7 @@ public class Checker {
         }
 
         boolean isObservable(int eventId, int vertex) {
-	    return observable[filterOfState[vertex]][eventId];
+            return observable[filterOfState[vertex]][eventId];
         }
     }
     // }}}
@@ -947,9 +947,9 @@ public class Checker {
         sb.append('<');
         for (Event e : events) {
             sb.append(" " + automaton.eventNames[e.id] + "(");
-	    boolean later = false;
+            boolean later = false;
             for(Object o : e.values) {
-		if (later) {
+                if (later) {
                     sb.append(", ");
                 }
                 sb.append(o.toString());
@@ -1019,14 +1019,14 @@ public class Checker {
             }
             if (!automaton.isObservable(event.id, state.vertex)) {
                 newActiveStates.add(state);
-		continue;
+                continue;
             }
             state = state.pushEvent(event);
             if (state.events.size() < automaton.maximumTransitionDepths[state.vertex]) {
                 newActiveStates.add(state);
                 continue;
             }
-	    boolean anyEnabled = false;
+            boolean anyEnabled = false;
             for (Transition transition : automaton.transitions[state.vertex]) {
 //DBG System.out.print("try " + state.vertex + " -> " + transition.target //DBG
 //DBG         + " with events");                                          //DBG
@@ -1052,9 +1052,9 @@ public class Checker {
                 // record transition
                 if (i == transition.steps.length) {
 //DBG System.out.println("tran"); //DBG
-		    anyEnabled = true;
-		    State newState = State.make(transition.target, store,
-						events, consumed, state);
+                    anyEnabled = true;
+                    State newState = State.make(transition.target, store,
+                                                events, consumed, state);
                     newActiveStates.add(newState);
 
                     // check for error state
@@ -1064,7 +1064,7 @@ public class Checker {
                     }
                 }
             }
-	    if (!anyEnabled) {
+            if (!anyEnabled) {
 //DBG System.out.println("stay"); //DBG
                 newActiveStates.add(state.popEvent());
             }
@@ -1140,12 +1140,12 @@ public class Checker {
             for (int i = 0; i < filters.length; ++i) {
                 filters[i] = ints();
             }
-	    String[] eventNames = new String[scan.nextInt()];
+            String[] eventNames = new String[scan.nextInt()];
             for (int i = 0; i < eventNames.length; ++i) {
                 int index = scan.nextInt();
                 eventNames[index] = scan.next();
             }
-	    String[] vertexNames = new String[scan.nextInt()];
+            String[] vertexNames = new String[scan.nextInt()];
             for (int i = 0; i < eventNames.length; ++i) {
                 vertexNames[i] = scan.next();
             }
@@ -1224,70 +1224,70 @@ public class Checker {
     private String eventIdsToString(Set<Integer> eventIds) {
         StringBuilder sb = new StringBuilder();
         sb.append('[');
-	boolean later = false;
+        boolean later = false;
         for (Integer id : eventIds) {
-	    if (later) {
-		sb.append(", ");
-	    }
+            if (later) {
+                sb.append(", ");
+            }
             sb.append(automaton.eventNames[id]);
-	    later = true;
+            later = true;
         }
         sb.append("]");
-	return sb.toString();
+        return sb.toString();
     }
 
     public String toDOT(int cap) {
-	StringBuffer s = new StringBuffer();
-	s.append("digraph Property {\n");
-	// add states as circles
-	for (int i = 0; i < automaton.transitions.length; i++) {
-	    s.append("  S_");
-	    s.append(i);
-	    s.append(" [label=\"");
-	    s.append(automaton.vertexNames[i]);
-	    if (automaton.errorMessages[i] != null) {
-		s.append(" : ");
-		s.append(automaton.errorMessages[i]);
-		s.append("\", shape=box];\n");
-	    }
-	    else s.append("\", shape=circle];\n");
-	}
-	// make start states double circles
-	for (int i : automaton.startVertices) {
-	    s.append("  S_");
-	    s.append(i);
-	    s.append(" [shape=doublecircle];\n");
-	}
-	// add transitions
-	for (int i = 0; i < automaton.transitions.length; i++)
-	    for (Transition transition : automaton.transitions[i]) {
-		s.append("  S_");
-		s.append(i);
-		s.append(" -> S_");
-		s.append(transition.target);
-		s.append(" [label=\"");
-		for (TransitionStep step : transition.steps) {
-		    s.append(cap <= 0 || step.eventIds.size() <= cap ? eventIdsToString(step.eventIds) : "[" + step.eventIds.size() + " ids (>" + cap + ")]");
-		    s.append(step.guard.toString());
-		    s.append("<");
-		    for(Map.Entry a : step.action.assignments.entrySet()) {
-			s.append(a.getKey());
-			s.append(" <- ");
-			s.append(a.getValue());
-			s.append(", ");
-		    }
-		    if (step.action.assignments.size() > 0) s.delete(s.length()-2, s.length());
-		    s.append(">; ");
-		}
-		if (transition.steps.length > 0) s.delete(s.length()-2, s.length());
-		s.append("\"];\n");
-	    }
-	s.append("}\n");
-	return s.toString();
+        StringBuffer s = new StringBuffer();
+        s.append("digraph Property {\n");
+        // add states as circles
+        for (int i = 0; i < automaton.transitions.length; i++) {
+            s.append("  S_");
+            s.append(i);
+            s.append(" [label=\"");
+            s.append(automaton.vertexNames[i]);
+            if (automaton.errorMessages[i] != null) {
+                s.append(" : ");
+                s.append(automaton.errorMessages[i]);
+                s.append("\", shape=box];\n");
+            }
+            else s.append("\", shape=circle];\n");
+        }
+        // make start states double circles
+        for (int i : automaton.startVertices) {
+            s.append("  S_");
+            s.append(i);
+            s.append(" [shape=doublecircle];\n");
+        }
+        // add transitions
+        for (int i = 0; i < automaton.transitions.length; i++)
+            for (Transition transition : automaton.transitions[i]) {
+                s.append("  S_");
+                s.append(i);
+                s.append(" -> S_");
+                s.append(transition.target);
+                s.append(" [label=\"");
+                for (TransitionStep step : transition.steps) {
+                    s.append(cap <= 0 || step.eventIds.size() <= cap ? eventIdsToString(step.eventIds) : "[" + step.eventIds.size() + " ids (>" + cap + ")]");
+                    s.append(step.guard.toString());
+                    s.append("<");
+                    for(Map.Entry a : step.action.assignments.entrySet()) {
+                        s.append(a.getKey());
+                        s.append(" <- ");
+                        s.append(a.getValue());
+                        s.append(", ");
+                    }
+                    if (step.action.assignments.size() > 0) s.delete(s.length()-2, s.length());
+                    s.append(">; ");
+                }
+                if (transition.steps.length > 0) s.delete(s.length()-2, s.length());
+                s.append("\"];\n");
+            }
+        s.append("}\n");
+        return s.toString();
     }
 
     public String toDOT() {
-	return toDOT(0);
+        return toDOT(0);
     }
 
     private static boolean logGuard = false;

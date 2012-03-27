@@ -1007,7 +1007,7 @@ public class Checker {
             for (State s : states) {
                 System.out.printf("\n  %s ( vertex = %s; len(events) = %d; len(bindings) = %d )",
                         first ? "{" : ",",
-                        s.vertex, s.events.size(), s.store.size());
+                        automaton.vertexNames[s.vertex], s.events.size(), s.store.size());
             }
             System.out.printf(" }\n");
             System.out.printf("event %d\n", event.id);
@@ -1291,7 +1291,7 @@ public class Checker {
     }
 
     private static boolean logGuard = false;
-    private static boolean logState = false;
+    private static boolean logState = true;
     private static boolean logTreap = false;
     // }}}
 }

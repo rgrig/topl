@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Scanner;
@@ -942,43 +943,74 @@ public class Checker {
         }
     }
 
-    void printEventQueue(Queue<Event> events) {
-        StringBuilder sb = new StringBuilder();
-        sb.append('<');
-        for (Event e : events) {
-            sb.append(" " + automaton.eventNames[e.id] + "(");
-            boolean later = false;
-            for(Object o : e.values) {
-                if (later) {
-                    sb.append(", ");
-                }
-                sb.append(o.toString());
-                later = true;
-            }
-            sb.append(")");
+    private IdentityHashMap<Object, Integer> printingIds;
+
+    int getIdForPrinting(Object o) {
+        Integer id = printingIds.get(o);
+        if (id == null) {
+            id = printingIds.size();
+            printingIds.put(o, id);
         }
-        sb.append(" >");
-        System.err.println(sb.toString());
+        return id;
     }
 
-    void printErrorState(State errorState) {
-        System.err.println(automaton.vertexNames[errorState.vertex]);
+    void printValues(Object[] values) {
+        boolean first = true;
+        System.err.printf("(");
+        for (Object v : values) {
+            if (first) {
+                first = false;
+            } else {
+                System.err.printf(",");
+            }
+            if (v instanceof String) {
+                System.err.printf("\"%s\"", (String) v);
+            } else if (v instanceof Integer) {
+                System.err.printf("%d", (Integer) v);
+            } else {
+                System.err.printf("obj(%d)", getIdForPrinting(v));
+            }
+        }
+        System.err.printf(")");
+    }
+
+    void printEventQueue(Queue<Event> events) {
+        boolean first = true;
+        for (Event e : events) {
+            if (first) {
+                first = false;
+            } else {
+                System.err.printf("; ");
+            }
+            System.err.printf("%s", automaton.eventNames[e.id]);
+            printValues(e.values);
+        }
+    }
+
+    void printErrorTraceRec(State errorState, int historyLength) {
+        --historyLength;
+        if (historyLength < 0) {
+            return;
+        }
+        if (errorState.parent != null) {
+            printErrorTraceRec(errorState.parent.state, historyLength);
+        }
+        System.err.printf("  -> %s: ", automaton.vertexNames[errorState.vertex]);
+        if (errorState.parent != null) {
+            printEventQueue(errorState.parent.events);
+        }
+        System.err.printf("\n");
     }
 
     void printErrorTrace(State errorState) {
-        if (errorState.parent != null) {
-            printErrorTrace(errorState.parent.state);
-            System.err.println("\n---- via events ----");
-            printEventQueue(errorState.parent.events);
-            System.err.println("\n--- got to state ---");
-        }
-        printErrorState(errorState);
+        printingIds = new IdentityHashMap<Object, Integer>();
+        printErrorTraceRec(errorState, historyLength);
+        printingIds = null;
     }
 
     void reportError(String msg, State errorState) {
         System.err.printf("TOPL: %s\n", msg);
         if (verbose) {
-            System.err.println("TOPL: Error trace:");
             printErrorTrace(errorState);
         }
     }
@@ -1008,6 +1040,7 @@ public class Checker {
                 System.out.printf("\n  %s ( vertex = %s; len(events) = %d; len(bindings) = %d )",
                         first ? "{" : ",",
                         automaton.vertexNames[s.vertex], s.events.size(), s.store.size());
+                first = false;
             }
             System.out.printf(" }\n");
             System.out.printf("event %s\n", automaton.eventNames[event.id]);

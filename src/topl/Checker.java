@@ -1010,7 +1010,7 @@ public class Checker {
                         automaton.vertexNames[s.vertex], s.events.size(), s.store.size());
             }
             System.out.printf(" }\n");
-            System.out.printf("event %d\n", event.id);
+            System.out.printf("event %s\n", automaton.eventNames[event.id]);
         }
         HashSet<State> newActiveStates = new HashSet<State>(2 * states.size());
         for (State state : states) {
@@ -1291,7 +1291,7 @@ public class Checker {
     }
 
     private static boolean logGuard = false;
-    private static boolean logState = true;
+    private static boolean logState = false;
     private static boolean logTreap = false;
     // }}}
 }

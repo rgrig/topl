@@ -471,26 +471,27 @@ let does_method_match
   r
 
 let get_tag x =
-  let string_of_method mn = function
-    | PA.Call -> "Call_" ^ mn
-    | PA.Return -> "Return_" ^ mn in
-  let cnt = ref (-1) in fun t (mns, ma) mn ->
-  let fp p acc =
-    let cm mn = does_method_match ({method_name=mn; method_arity=ma}, t) p in
-    if List.exists cm mns then p :: acc else acc in
-  if U.hashtbl_fold_values fp x.observables [] <> [] then begin
-    match U.hashtbl_fold_keys fp x.pattern_tags [] with
-      | [] -> None
-      | ps ->
-          incr cnt;
-          let at p =
-            let ts = Hashtbl.find x.pattern_tags p in
-            (* printf "added tag %d\n" !cnt; *)
-            Hashtbl.replace x.pattern_tags p (!cnt :: ts);
-            Hashtbl.replace x.event_names !cnt (string_of_method mn t) in
-          List.iter at ps;
-          Some !cnt
-  end else None
+  let cnt = ref (-1) in
+  fun t (mns, ma) mn ->
+    let en = (* event name *)
+      fprintf str_formatter "%a_%s" PA.pp_event_type t mn;
+      flush_str_formatter () in
+    let fp p acc =
+      let cm mn = does_method_match ({method_name=mn; method_arity=ma}, t) p in
+      if List.exists cm mns then p :: acc else acc in
+    if U.hashtbl_fold_values fp x.observables [] <> [] then begin
+      match U.hashtbl_fold_keys fp x.pattern_tags [] with
+        | [] -> None
+        | ps ->
+            incr cnt;
+            let at p =
+              let ts = Hashtbl.find x.pattern_tags p in
+              (* printf "added tag %d\n" !cnt; *)
+              Hashtbl.replace x.pattern_tags p (!cnt :: ts);
+              Hashtbl.replace x.event_names !cnt en in
+            List.iter at ps;
+            Some !cnt
+    end else None
 
 let bc_send_call_event id param_types =
   let n = List.length (List.filter fst param_types) in

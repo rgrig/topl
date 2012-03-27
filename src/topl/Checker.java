@@ -882,7 +882,7 @@ public class Checker {
                                 maximumTransitionDepths[s], t.steps.length);
                 }
             }
-            int maxEvent = 0;
+            int maxEvent = -1;
             for (int[] f : filters) {
                 for (int e : f) {
                     if (e > maxEvent) maxEvent = e;
@@ -890,7 +890,7 @@ public class Checker {
             }
             observable = new boolean[filters.length][maxEvent + 1];
             for (int f = 0; f < filters.length; f++) {
-                for (int e = 0; e < maxEvent; e++) {
+                for (int e = 0; e <= maxEvent; e++) {
                     observable[f][e] = true;
                 }
             }
@@ -1037,9 +1037,10 @@ public class Checker {
             boolean first = true;
             System.out.printf("States");
             for (State s : states) {
-                System.out.printf("\n  %s ( vertex = %s; len(events) = %d; len(bindings) = %d )",
+                System.out.printf("\n  %s ( vertex = %s(%d); len(events) = %d; len(bindings) = %d )",
                         first ? "{" : ",",
-                        automaton.vertexNames[s.vertex], s.events.size(), s.store.size());
+                        automaton.vertexNames[s.vertex], s.vertex,
+                        s.events.size(), s.store.size());
                 first = false;
             }
             System.out.printf(" }\n");
@@ -1270,7 +1271,7 @@ public class Checker {
     }
 
     public String toDOT(int cap) {
-        StringBuffer s = new StringBuffer();
+        StringBuilder s = new StringBuilder();
         s.append("digraph Property {\n");
         // add states as circles
         for (int i = 0; i < automaton.transitions.length; i++) {

@@ -1,0 +1,22 @@
+TOPL: f failed
+  -> start: 
+  -> start: call_main(obj[0])
+  -> error: call_f()
+TOPL: g failed
+  -> start: 
+  -> start: call_main(obj[0])
+  -> start: call_f()
+  -> error: call_g()
+TOPL: g failed
+  -> start: 
+  -> start: call_main(obj[0])
+  -> start: call_f()
+  -> start: call_g()
+  -> error: return_g()
+TOPL: f failed
+  -> start: 
+  -> start: call_main(obj[0])
+  -> start: call_f()
+  -> start: call_g()
+  -> start: return_g()
+  -> error: return_f()

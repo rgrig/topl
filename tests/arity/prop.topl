@@ -1,0 +1,11 @@
+property shouldFail
+  observe <*>
+  prefix <Main>
+  start -> start: *
+  start -> error: *.f(*)
+
+property shouldNotFail
+  observe <*>
+  prefix <Main>
+  start -> start: *
+  start -> error: *.f()

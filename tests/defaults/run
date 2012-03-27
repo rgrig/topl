@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+mkdir -p indir
+javac Main.java -d indir
+toplc -i indir -o outdir prop.topl
+javac Config.java -cp outdir -d outdir
+java -cp outdir Config
+rm -rf indir outdir

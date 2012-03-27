@@ -1,0 +1,9 @@
+property f
+  observe <*>
+  start -> start: *
+  start -> error: <Main.f>()
+
+property g
+  observe <*>
+  start -> start: *
+  start -> error: <Main.g>()

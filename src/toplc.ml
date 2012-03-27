@@ -138,65 +138,62 @@ let rec pp_v_list pe ppf = function
 let pp_int f x = fprintf f "%d" x
 let pp_string f x = fprintf f "%s" x
 
-(* }}} *)
-(* pretty printing of Java representation in a raw text file *) (* {{{ *)
-(* NOTE: The prefix pq comes after pp; it means nothing otherwise. *)
-let pq_string ios f s = pp_int f (Hashtbl.find ios s)
-let pq_list pe f x =
+let pp_string_as_int ios f s = pp_int f (Hashtbl.find ios s)
+let pp_list pe f x =
   fprintf f "@[<2>%d@ %a@]" (List.length x) (U.pp_list " " pe) x
-let pq_array pe f x = pq_list pe f (Array.to_list x)
+let pp_array pe f x = pp_list pe f (Array.to_list x)
 
-let pq_value_guard ioc f = function
+let pp_value_guard ioc f = function
   | PA.Variable (v, i) -> fprintf f "0 %d %d" i v
-  | PA.Constant (c, i) -> fprintf f "1 %d %a" i (pq_string ioc) c
+  | PA.Constant (c, i) -> fprintf f "1 %d %a" i (pp_string_as_int ioc) c
 
-let pq_pattern tags f p =
-  fprintf f "%a" (pq_list pp_int) (Hashtbl.find tags p)
+let pp_pattern tags f p =
+  fprintf f "%a" (pp_list pp_int) (Hashtbl.find tags p)
 
-let pq_condition ioc = pq_list (pq_value_guard ioc)
+let pp_condition ioc = pp_list (pp_value_guard ioc)
 
-let pq_assignment f (x, i) =
+let pp_assignment f (x, i) =
   fprintf f "%d %d" x i
 
-let pq_guard tags ioc f { PA.tag_guard = p; PA.value_guards = cs } =
-  fprintf f "%a %a" (pq_pattern tags) p (pq_condition ioc) cs
+let pp_guard tags ioc f { PA.tag_guard = p; PA.value_guards = cs } =
+  fprintf f "%a %a" (pp_pattern tags) p (pp_condition ioc) cs
 
-let pq_action = pq_list pq_assignment
+let pp_action = pp_list pp_assignment
 
-let pq_step tags ioc f { PA.guard = g; PA.action = a } =
-  fprintf f "%a %a" (pq_guard tags ioc) g pq_action a
+let pp_step tags ioc f { PA.guard = g; PA.action = a } =
+  fprintf f "%a %a" (pp_guard tags ioc) g pp_action a
 
-let pq_transition tags ioc f { steps = ss; target = t } =
-  fprintf f "%a %d" (pq_list (pq_step tags ioc)) ss t
+let pp_transition tags ioc f { steps = ss; target = t } =
+  fprintf f "%a %d" (pp_list (pp_step tags ioc)) ss t
 
-let pq_vertex tags ioc f v =
-  fprintf f "%a" (pq_list (pq_transition tags ioc)) v.outgoing_transitions
+let pp_vertex tags ioc f v =
+  fprintf f "%a" (pp_list (pp_transition tags ioc)) v.outgoing_transitions
 
-let pq_event_name f pi pn =
+let pp_event_name f pi pn =
   fprintf f " %d %s" pi pn
 
-let pq_event_names f pns =
+let pp_event_names f pns =
   fprintf f "%d " (Hashtbl.length pns);
-  Hashtbl.iter (pq_event_name f) pns
+  Hashtbl.iter (pp_event_name f) pns
 
 (* TODO: consider separator *)
-let pq_vertex_name f v =
+let pp_vertex_name f v =
   fprintf f " %s" v.vertex_name
 
-let pq_automaton ioc f x =
+let pp_automaton ioc f x =
   let pov = compute_pov x in
   let obs_p p = Hashtbl.find x.pattern_tags (Hashtbl.find x.observables p) in
   let obs_tags = List.map obs_p (U.unique (get_properties x)) in
-  fprintf f "%a@\n" (pq_list pp_int) (starts x);
-  fprintf f "%a@\n" (pq_list (pq_string ioc)) (errors x);
-  fprintf f "%a@\n" (pq_array (pq_vertex x.pattern_tags ioc)) x.vertices;
-  fprintf f "%a@\n" (pq_array pp_int) pov;
-  fprintf f "%a@\n" (pq_list (pq_list pp_int)) obs_tags;
-  fprintf f "%a@\n" pq_event_names x.event_names;
-  fprintf f "%a@\n" (pq_array pq_vertex_name) x.vertices
+  fprintf f "%a@\n" (pp_list pp_int) (starts x);
+  fprintf f "%a@\n" (pp_list (pp_string_as_int ioc)) (errors x);
+  fprintf f "%a@\n" (pp_array (pp_vertex x.pattern_tags ioc)) x.vertices;
+  fprintf f "%a@\n" (pp_array pp_int) pov;
+  fprintf f "%a@\n" (pp_list (pp_list pp_int)) obs_tags;
+  fprintf f "%a@\n" pp_event_names x.event_names;
+  fprintf f "%a@\n" (pp_array pp_vertex_name) x.vertices
 
 let index_constants p =
-  let r = Hashtbl.create 13 in (* maps constants to their index *)
+  let r = Hashtbl.create 0 in (* maps constants to their index *)
   let i = ref (-1) in
   let add c = if not (Hashtbl.mem r c) then Hashtbl.add r c (incr i; !i) in
   let value_guard = function PA.Constant (c, _) -> add c | _ -> () in
@@ -209,7 +206,7 @@ let index_constants p =
   List.iter add (errors p);
   r
 
-let pq_constants j constants =
+let pp_constants j constants =
   let constants = Array.to_list constants in
   fprintf j "@[";
   fprintf j "package topl;@\n";
@@ -234,8 +231,8 @@ let generate_checkers out_dir p =
   let (jc, j), (tc, t) = o "java", o "text" in
   let ioc = index_constants p in
   let coi = inverse_index (fun x -> x) ioc in
-  fprintf j "@[%a@." pq_constants coi;
-  fprintf t "@[%a@." (pq_automaton ioc) p;
+  fprintf j "@[%a@." pp_constants coi;
+  fprintf t "@[%a@." (pp_automaton ioc) p;
   List.iter close_out_noerr [jc; tc];
   ignore (Sys.command
     (Printf.sprintf

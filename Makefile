@@ -17,6 +17,9 @@ native: src/config.ml
 	@$(OCAMLBUILD) $(NATIVES)
 	ln -sf toplc.native toplc
 
+test: default
+	@cd tests; ./test -c
+
 src/config.ml:
 	echo "let src_dir = \"$(CURDIR)/src\"" > src/config.ml
 
@@ -29,4 +32,4 @@ clean:
 	@rm -rf classes
 	@rm -f toplc src/config.ml
 
-.PHONY: byte checker clean default native
+.PHONY: byte checker clean default native test

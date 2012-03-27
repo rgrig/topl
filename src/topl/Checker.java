@@ -882,15 +882,9 @@ public class Checker {
                                 maximumTransitionDepths[s], t.steps.length);
                 }
             }
-            int maxEvent = -1;
-            for (int[] f : filters) {
-                for (int e : f) {
-                    if (e > maxEvent) maxEvent = e;
-                }
-            }
-            observable = new boolean[filters.length][maxEvent + 1];
+            observable = new boolean[filters.length][eventNames.length];
             for (int f = 0; f < filters.length; f++) {
-                for (int e = 0; e <= maxEvent; e++) {
+                for (int e = 0; e < eventNames.length; e++) {
                     observable[f][e] = true;
                 }
             }

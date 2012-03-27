@@ -1165,29 +1165,23 @@ public class Checker {
         Automaton automaton() {
             int[] startVertices = ints();
             String[] errorMessages = strings();
-            Transition[][] transitions = new Transition[scan.nextInt()][];
+            String[] vertexNames = new String[scan.nextInt()];
+            Transition[][] transitions = new Transition[vertexNames.length][];
             for (int i = 0; i < transitions.length; ++i) {
-                transitions[i] = vertex();
+                vertexNames[i] = oneString();
+                transitions[i] = transitions();
             }
             int filterOfState[] = ints();
             int[][] filters = new int[scan.nextInt()][];
             for (int i = 0; i < filters.length; ++i) {
                 filters[i] = ints();
             }
-            String[] eventNames = new String[scan.nextInt()];
-            for (int i = 0; i < eventNames.length; ++i) {
-                int index = scan.nextInt();
-                eventNames[index] = scan.next();
-            }
-            String[] vertexNames = new String[scan.nextInt()];
-            for (int i = 0; i < vertexNames.length; ++i) {
-                vertexNames[i] = scan.next();
-            }
+            String[] eventNames = strings();
             return new Automaton(startVertices, errorMessages, transitions,
                                  filterOfState, filters, eventNames, vertexNames);
         }
 
-        Transition[] vertex() {
+        Transition[] transitions() {
             Transition[] transitions = new Transition[scan.nextInt()];
             for (int i = 0; i < transitions.length; ++i) {
                 transitions[i] = transition();
@@ -1245,10 +1239,14 @@ public class Checker {
             return result;
         }
 
+        String oneString() {
+            return (String) constants[scan.nextInt()];
+        }
+
         String[] strings() {
             String[] result = new String[scan.nextInt()];
             for (int i = 0; i < result.length; ++i) {
-                result[i] = (String) constants[scan.nextInt()];
+                result[i] = oneString();
             }
             return result;
         }

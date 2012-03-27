@@ -70,10 +70,10 @@ type automaton =
   { vertices : vertex_data array
   ; observables : (property, tag_guard) Hashtbl.t
   ; pattern_tags : (tag_guard, tag list) Hashtbl.t
-  ; event_names : (int, string) Hashtbl.t }
   (* The keys of [pattern_tags] are filled in during the initial conversion,
     but the values (the tag list) is filled in while the code is being
     instrumented. *)
+  ; event_names : (int, string) Hashtbl.t }
 
 let check_automaton x =
   let rec is_decreasing x = function
@@ -117,12 +117,14 @@ let starts x =
     | _ -> ks in
   array_foldi f [] x.vertices
 
-let escape_java_string s = s (* TODO *)
+(* TODO(rgrig): Escape properly. *)
+let mk_java_string_literal s =
+  Printf.sprintf "\"%s\"" s
 
 let errors x =
   let f = function
     | {vertex_name="error"; vertex_property={PA.message=e;_};_} ->
-        "\"" ^ escape_java_string e ^ "\""
+        mk_java_string_literal e
     | _ -> "null" in
   x.vertices >> Array.map f >> Array.to_list
 
@@ -137,8 +139,9 @@ let rec pp_v_list pe ppf = function
 
 let pp_int f x = fprintf f "%d" x
 let pp_string f x = fprintf f "%s" x
-
 let pp_string_as_int ios f s = pp_int f (Hashtbl.find ios s)
+let pp_string_literal ios f s =
+  pp_string_as_int ios f (mk_java_string_literal s)
 let pp_list pe f x =
   fprintf f "@[<2>%d@ %a@]" (List.length x) (U.pp_list " " pe) x
 let pp_array pe f x = pp_list pe f (Array.to_list x)
@@ -167,7 +170,9 @@ let pp_transition tags ioc f { steps = ss; target = t } =
   fprintf f "%a %d" (pp_list (pp_step tags ioc)) ss t
 
 let pp_vertex tags ioc f v =
-  fprintf f "%a" (pp_list (pp_transition tags ioc)) v.outgoing_transitions
+  fprintf f "%a %a"
+    (pp_string_literal ioc) v.vertex_name
+    (pp_list (pp_transition tags ioc)) v.outgoing_transitions
 
 let pp_event_name f pi pn =
   fprintf f " %d %s" pi pn
@@ -176,9 +181,12 @@ let pp_event_names f pns =
   fprintf f "%d " (Hashtbl.length pns);
   Hashtbl.iter (pp_event_name f) pns
 
-(* TODO: consider separator *)
-let pp_vertex_name f v =
-  fprintf f " %s" v.vertex_name
+let list_of_hash h =
+  let r = ref [] in
+  for i = Hashtbl.length h - 1 downto 0 do
+    r := Hashtbl.find h i :: !r
+  done;
+  !r
 
 let pp_automaton ioc f x =
   let pov = compute_pov x in
@@ -189,20 +197,22 @@ let pp_automaton ioc f x =
   fprintf f "%a@\n" (pp_array (pp_vertex x.pattern_tags ioc)) x.vertices;
   fprintf f "%a@\n" (pp_array pp_int) pov;
   fprintf f "%a@\n" (pp_list (pp_list pp_int)) obs_tags;
-  fprintf f "%a@\n" pp_event_names x.event_names;
-  fprintf f "%a@\n" (pp_array pp_vertex_name) x.vertices
+  fprintf f "%a@\n"
+    (pp_list (pp_string_literal ioc)) (list_of_hash x.event_names)
 
 let index_constants p =
   let r = Hashtbl.create 0 in (* maps constants to their index *)
   let i = ref (-1) in
   let add c = if not (Hashtbl.mem r c) then Hashtbl.add r c (incr i; !i) in
+  let add_js s = add (mk_java_string_literal s) in
   let value_guard = function PA.Constant (c, _) -> add c | _ -> () in
   let event_guard g = List.iter value_guard g.PA.value_guards in
   let label l = event_guard l.PA.guard in
   let transition t = List.iter label t.steps in
-  let vertex_data v = List.iter transition v.outgoing_transitions in
-  let automaton a = Array.iter vertex_data a.vertices in
-  automaton p;
+  let vertex_data v =
+    add_js v.vertex_name; List.iter transition v.outgoing_transitions in
+  Array.iter vertex_data p.vertices;
+  U.hashtbl_fold_values (fun en () -> add_js en) p.event_names ();
   List.iter add (errors p);
   r
 

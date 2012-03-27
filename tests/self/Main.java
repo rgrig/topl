@@ -1,4 +1,4 @@
-public class TreapTest {
+public class Main {
     public static void main(String[] args) {
 	Treap<String> t0 = Treap.empty();
 	Treap<String> t1 = t0.insert("Radu");

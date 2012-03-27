@@ -1146,7 +1146,7 @@ public class Checker {
                 eventNames[index] = scan.next();
             }
             String[] vertexNames = new String[scan.nextInt()];
-            for (int i = 0; i < eventNames.length; ++i) {
+            for (int i = 0; i < vertexNames.length; ++i) {
                 vertexNames[i] = scan.next();
             }
             return new Automaton(startVertices, errorMessages, transitions,

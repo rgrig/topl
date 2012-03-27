@@ -1043,7 +1043,7 @@ public class Checker {
                 first = false;
             }
             System.out.printf(" }\n");
-            System.out.printf("event %s\n", automaton.eventNames[event.id]);
+            System.out.printf("event %d: %s\n", event.id, automaton.eventNames[event.id]);
         }
         HashSet<State> newActiveStates = new HashSet<State>(2 * states.size());
         for (State state : states) {
@@ -1262,7 +1262,7 @@ public class Checker {
             if (later) {
                 sb.append(", ");
             }
-            sb.append(automaton.eventNames[id]);
+            sb.append(id + ": " + automaton.eventNames[id]);
             later = true;
         }
         sb.append("]");

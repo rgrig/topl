@@ -7,5 +7,6 @@ public class TreapTest {
 	Treap<String> t4 = t3.insert("Distefano");
 	System.out.println(t4);
 	Treap<String> t5 = t3.insert("Dijkstra");
+	System.out.println(t5);
     }
 }

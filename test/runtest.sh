@@ -1,0 +1,1 @@
+./toplc.native -i test -o test_instrumented test/treaptest.topl

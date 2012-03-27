@@ -1,0 +1,9 @@
+property Fork
+  message "A new Treap was computed on the basis of an older-than-current one."
+  observe <Treap.{insert, remove}>
+  prefix <Treap>
+  start -> start: *
+  start -> current: T := *.<insert>(*)
+  current -> current: T := *.<insert>(*)
+  current -> old: * := t.<insert>(*)
+  old -> error: * := t.<insert>(*)

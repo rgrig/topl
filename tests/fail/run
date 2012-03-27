@@ -1,0 +1,6 @@
+#!/usr/bin/env bash
+mkdir -p indir
+javac A.java -d indir
+toplc -i indir -o outdir fail.topl
+java -cp outdir A
+rm -rf indir outdir

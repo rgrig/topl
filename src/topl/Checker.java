@@ -968,7 +968,7 @@ public class Checker {
             } else if (v instanceof Integer) {
                 System.err.printf("%d", (Integer) v);
             } else {
-                System.err.printf("obj(%d)", getIdForPrinting(v));
+                System.err.printf("obj[%d]", getIdForPrinting(v));
             }
         }
         System.err.printf(")");

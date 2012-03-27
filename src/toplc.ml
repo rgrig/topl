@@ -151,8 +151,6 @@ let pq_value_guard ioc f = function
   | PA.Constant (c, i) -> fprintf f "1 %d %a" i (pq_string ioc) c
 
 let pq_pattern tags f p =
-  if log_dbg then
-    printf "@\n@[len(tags) %d@]" (List.length (Hashtbl.find tags p));
   fprintf f "%a" (pq_list pp_int) (Hashtbl.find tags p)
 
 let pq_condition ioc = pq_list (pq_value_guard ioc)
@@ -307,8 +305,6 @@ let transform_properties ps =
     let ls = List.map (transform_label ifv full_p.pattern_tags) ls in
     add_transition s {steps=ls; target=t} in
   List.iter (fun p -> List.iter (pe p) p.PA.transitions) ps;
-  if log_dbg then
-    printf "@\n@[len(pattern_tags) %d@]" (Hashtbl.length full_p.pattern_tags);
   full_p
 
 (* }}} *)

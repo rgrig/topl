@@ -8,7 +8,7 @@ property ForwardUncommitted
   prefix <javax.servlet.{ServletOutputStream,ServletResponse}>
   prefix <java.io.PrintWriter>
   start -> start: *
-  start -> tracking: R := *.<ServletResponse.\<init\>>[*] // TODO: no *.
+  start -> tracking: R := <ServletResponse.\<init\>>[*]
   tracking -> ok: r.flushBuffer()
   tracking -> gotWriter: W := r.getWriter()
   gotWriter -> ok: w.flush(), r.flushBuffer()

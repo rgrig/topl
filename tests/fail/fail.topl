@@ -1,0 +1,4 @@
+property NothingHappens
+  observe <*>
+  start -> start: *
+  start -> error: *

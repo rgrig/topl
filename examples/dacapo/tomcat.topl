@@ -2,6 +2,7 @@ property ForwardUncommitted
   message "A ServletResponse was forwarded before being committed."
   // TODO assume InterleavedResponse_Weak
   observe <javax.servlet.{ServletOutputStream,ServletResponse}.*>
+  observe <javax.servlet.RequestDispatcher.forward>
   observe <java.io.PrintWriter.flush>
   prefix <javax.servlet>
   prefix <javax.servlet.{ServletOutputStream,ServletResponse}>

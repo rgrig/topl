@@ -114,28 +114,32 @@
     | _ ->
         eprintf "@[ERROR: Property %s has more than one message.@." n; e ()
 
-  let pp_or_re f p =
-    let pp f s = fprintf f "\\(%s\\)" s in
-    fprintf f "\\(%a\\)" (U.pp_list "\\|" pp) p
+  let rec or_re b = function
+    | [] -> ()
+    | [x] -> Printf.bprintf b "\\(%s\\)" x
+    | x :: xs -> Printf.bprintf b "\\(%s\\)\\|%a" x or_re xs
 
-  let prefix_of_list = function
-    | [] -> ""
-    | p ->
-        fprintf str_formatter "\\(%a\\.\\)?" pp_or_re p;
-        flush_str_formatter ()
+  let prefix_of_list xs =
+    let b = Buffer.create 0 in
+    Printf.bprintf b "\\(\\(%a\\)\\.\\)?" or_re xs;
+    Buffer.contents b
+
+  let exact_or_re xs =
+    let b = Buffer.create 0 in
+    Printf.bprintf b "^%a$" or_re xs;
+    Buffer.contents b
 
   let mk_property e n xs =
     let m, o, p, t = split_items xs in
     let p = prefix_of_list p in
-    let pm m = PA.mk_pattern (sprintf "^%s%s$" p m) in
+    let pm m = PA.mk_pattern (Printf.sprintf "^%s%s$" p m) in
     let ptg tg = { tg with PA.method_name = pm tg.PA.method_name } in
     let pg g = { g with PA.tag_guard = ptg g.PA.tag_guard } in
     let pl l = { l with PA.guard = pg l.PA.guard } in
     let pt t = { t with PA.labels = List.map pl t.PA.labels } in
     { PA.name = n
     ; PA.message = extract_message e n m
-    ; PA.observable = PA.mk_pattern
-        (fprintf str_formatter "^%a$" pp_or_re o; flush_str_formatter ())
+    ; PA.observable = PA.mk_pattern (exact_or_re o)
     ; PA.transitions = List.map pt (List.concat t) }
 
 %}

@@ -537,12 +537,13 @@ let does_method_match
   let bn = PA.pattern_matches re mn in
   let r = ba && bt && bn in
   if log_mm then begin
-    printf "@\n@[%s " (if r then "✓" else "x");
-    printf "(%a, %s, %d) matches (%a, %s, %a)@]"
+    printf "@\n@[<2>%s " (if r then "✓" else "✗");
+    printf "(%a, %s, %d)@ matches (%a, %s, %a)@ gives (%b, %b, %b)@]"
       PA.pp_event_type mt mn ma
       (U.pp_option PA.pp_event_type) t re.PA.p_string (U.pp_option U.pp_int) a
+      bt bn ba
   end;
-  ba && bt && bn
+  r
 
 let get_tag x =
   let string_of_method mn = function

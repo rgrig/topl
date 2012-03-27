@@ -103,13 +103,8 @@ let get_vertices p =
   let f acc t = t.PA.source :: t.PA.target :: acc in
   "start" :: "error" :: List.fold_left f [] p.PA.transitions
 
-let get_variables p =
-  let f = function PA.Variable (v, _) -> Some v | _ -> None in
-  U.map_option f (PA.get_value_guards p)
-
 (* }}} *)
 (* pretty printing to Java *) (* {{{ *)
-(* TODO(rgrig): Most of these are unused and should be removed. *)
 
 let array_foldi f z xs =
   let r = ref z in
@@ -135,13 +130,6 @@ let compute_pov x =
   let iop = to_ints (get_properties x) in
     Array.map (fun v -> Hashtbl.find iop v.vertex_property) x.vertices
 
-let pp_array pe ppf a =
-  let l = Array.length a in
-  if l > 0 then fprintf ppf "@\n%a" pe (0, a.(0));
-  for i = 1 to l - 1 do fprintf ppf ",@\n%a" pe (i, a.(i)) done
-
-let pp_h_list pe f xs = U.pp_list ", " pe f xs
-
 let rec pp_v_list pe ppf = function
   | [] -> ()
   | [x] -> fprintf ppf "@\n%a" pe x
@@ -149,64 +137,6 @@ let rec pp_v_list pe ppf = function
 
 let pp_int f x = fprintf f "%d" x
 let pp_string f x = fprintf f "%s" x
-
-let pp_int_list f xs =
-  fprintf f "@[<2>new int[]{%a}@]" (pp_h_list pp_int) xs
-
-let pp_int_list_display n f xs =
-  let l = List.length xs in
-  if l > n then fprintf f "@[<2>new int[]{%d elements (more than %d)}@]" l n
-  else pp_int_list f xs
-
-let pp_pattern tags f p = pp_int_list f (Hashtbl.find tags p)
-
-let pp_value_guard f = function
-  | PA.Variable (v, i) -> fprintf f "new StoreEqualityGuard(%d, %d)" i v
-  | PA.Constant (c, i) -> fprintf f "new ConstantEqualityGuard(%d, %s)" i c
-
-let pp_assignment f (x, i) =
-  fprintf f "new Action.Assignment(%d, %d)" x i
-
-let pp_condition f a =
-  fprintf f "@[<2>new AndGuard(new Guard[]{%a})@]" (pp_h_list pp_value_guard) a
-
-let pp_guard tags f {PA.tag_guard=p; PA.value_guards=cs} =
-  fprintf f "@[<2>%a@],@\n@[<2>%a@]" (pp_pattern tags) p pp_condition cs
-
-let pp_action f a =
-  fprintf f "@[<2>new Action(new Action.Assignment[]{%a})@]" (pp_h_list pp_assignment) a
-
-let pp_step tags f {PA.guard=g; PA.action=a} =
-  fprintf f "@[<2>new TransitionStep(@\n%a,@\n%a)@]" (pp_guard tags) g pp_action a
-
-let pp_transition tags f {steps=ss;target=t} =
-  fprintf f "@[<2>new Transition(@\n@[<2>new TransitionStep[]{%a@]@\n}, %d)@]" (pp_v_list (pp_step tags)) ss t
-
-let pp_vertex tags f (vi, {outgoing_transitions=ts;_}) =
-  fprintf f "@[<2>new Transition[]{ /* from %d */%a@]@\n}"
-    vi
-    (pp_v_list (pp_transition tags)) ts
-
-let pp_automaton f x =
-  let pov = compute_pov x in
-  let obs_p p = Hashtbl.find x.pattern_tags (Hashtbl.find x.observables p) in
-  let obs_tags = List.map obs_p (U.unique (get_properties x)) in
-  fprintf f "package topl;@\n@\n";
-  fprintf f "import static topl.Checker.*;@\n@\n";
-  fprintf f "@[<2>public class Property {@\n";
-  fprintf f   "@[<2>public static Checker checker = new Checker(new Automaton(@\n";
-  fprintf f     "/* start nodes, one for each property */@\n";
-  fprintf f     "%a,@\n" pp_int_list (starts x);
-  fprintf f     "/* error messages, one non-null for each property */@\n";
-  fprintf f     "@[<2>new String[]{%a}@],@\n" (pp_h_list pp_string) (errors x);
-  fprintf f     "/* transitions as an adjacency list */@\n";
-  fprintf f     "@[<2>new Transition[][]{%a@]@\n},@\n" (pp_array (pp_vertex x.pattern_tags)) x.vertices;
-  fprintf f     "/* property the vertex comes from */@\n";
-  fprintf f     "%a,@\n" pp_int_list (Array.to_list pov);
-  fprintf f     "/* events each property is observing */@\n";
-  fprintf f     "@[<2>new int[][]{%a@]@\n}" (pp_v_list pp_int_list) obs_tags;
-  fprintf f   "@]));@\n";
-  fprintf f "@]@\n}@\n"
 
 (* }}} *)
 (* pretty printing of Java representation in a raw text file *) (* {{{ *)
@@ -395,7 +325,6 @@ let java_io_PrintStream = utf8_for_class "java.io.PrintStream"
 let out = utf8_for_field "out"
 let println = utf8_for_method "println"
 let event = utf8_for_class "topl.Checker$Event"
-(* let event_init = utf8_for_method "topl.Checker$Event.<init>" *)
 let init = utf8_for_method "<init>"
 let property = utf8_for_class "topl.Property"
 let property_checker = utf8_for_field "checker"
@@ -663,9 +592,6 @@ let get_overrides h c m =
   let cts c = uts (B.Name.external_utf8_for_class c) in
   let qualify c =  (cts c) ^ "." ^ m.method_name in
   (List.map qualify ancestors, m.method_arity)
-
-let raise_stack n x =
-  B.Utils.u2 ((x : B.Utils.u2 :> int) + n)
 
 let instrument_method get_tag h c m =
   let mth = mk_method m in

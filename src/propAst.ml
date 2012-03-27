@@ -31,12 +31,6 @@ type ('event_type, 'method_name, 'method_arity) tag =
 type 'method_name tag_guard =
   ((event_type option), 'method_name, (int option)) tag
 
-type event_tag = (event_type, string, int) tag
-
-let check_event_tag t =
-  assert (t.method_name <> "");
-  assert (0 <= t.method_arity)
-
 type ('method_name, 'value_guard) event_guard =
   { tag_guard : 'method_name tag_guard
   ; value_guards : 'value_guard list }
@@ -48,12 +42,6 @@ let check_event_guard g =
   U.option () chk_all g.tag_guard.method_arity
 
 type 'variable action = ('variable * int) list
-
-type 'value event =
-  { event_tag : event_tag
-  ; event_values : 'value U.IntMap.t }
-  (* I'm using an IntMap rather than an array because I prefer immutability.
-    Performance is unlikely to be a problem as the typical size is <5. *)
 
 type ('method_name, 'value_guard, 'variable) label_p =
   { guard : ('method_name, 'value_guard) event_guard
@@ -94,36 +82,12 @@ let vars_of_edge f e =
 let written_vars t = vars_of_edge wvars t
 let read_vars t = vars_of_edge rvars t
 
-let mk_event et mn ma vs =
-  { event_tag =
-    { event_type = et
-    ; method_name = mn
-    ; method_arity = ma }
-  ; event_values =
-      let f (i, acc) v = (succ i, U.IntMap.add i v acc) in
-      snd (List.fold_left f (0, U.IntMap.empty) vs) }
-
 let mk_event_guard t v =
   let r = { tag_guard = t; value_guards = v } in
   check_event_guard r; r
 
-let edge_length e = List.length e.labels
-
 let outgoing a src =
   List.filter (fun e -> e.source = src) a.transitions
-
-let guards_of_automaton {transitions=ts; _ } =
-  let gol acc l = l.guard :: acc in
-  let goe acc e = List.fold_left gol acc e.labels in
-  List.fold_left goe [] ts
-
-let get_tag_guards p =
-  let gs = guards_of_automaton p in
-  List.map (fun x -> x.tag_guard) gs
-
-let get_value_guards p =
-  let gs = guards_of_automaton p in
-  List.concat (List.map (fun x -> x.value_guards) gs)
 
 let pp_event_type f = function
   | Call -> fprintf f "call"

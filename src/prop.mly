@@ -88,9 +88,8 @@
     assert (t <> Some PA.Return || (cgs = [] && cas = []));
     let mk t' xgs xas =
       if t = t' || t' = None || (t = None && (xgs <> [] || xas <> [])) then
-        let g =
-          { PA.tag_guard = { g.PA.tag_guard with PA.event_type = t' }
-          ; PA.value_guards = xgs } in
+        let g = PA.mk_event_guard
+          { g.PA.tag_guard with PA.event_type = t' } xgs in
         PA.check_event_guard g;
         [ { PA.guard = g; PA.action = xas } ]
       else [] in

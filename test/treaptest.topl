@@ -3,7 +3,7 @@ property Fork
   observe <Treap.{insert, remove}>
   prefix <Treap>
   start -> start: *
-  start -> current: T := *.<insert>(*)
-  current -> current: T := *.<insert>(*)
-  current -> old: * := t.<insert>(*)
-  old -> error: * := t.<insert>(*)
+  start -> current: T := *.insert[*]
+  current -> current: T := *.insert[*]
+  current -> old: t.insert[*]
+  old -> error: t.insert[*]

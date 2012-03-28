@@ -1,0 +1,12 @@
+property fgOk
+  observe <*f>
+  prefix <Main>
+  start -> start: *
+  start -> gotF: f()
+  gotF -> error: g()
+
+property gNok
+  observe <*g>
+  prefix <Main>
+  start -> start: *
+  start -> error: g()

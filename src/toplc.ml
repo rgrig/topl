@@ -97,7 +97,7 @@ let inverse_index f h =
   Array.map U.from_some r
 
 let get_properties x =
-  x.vertices >> Array.map (function {vertex_property=p;_} -> p) >> Array.to_list
+  x.vertices >> Array.map (fun v -> v.vertex_property) >> Array.to_list
 
 let get_vertices p =
   let f acc t = t.PA.source :: t.PA.target :: acc in
@@ -130,7 +130,7 @@ let errors x =
 
 let compute_pov x =
   let iop = to_ints (get_properties x) in
-    Array.map (fun v -> Hashtbl.find iop v.vertex_property) x.vertices
+  Array.map (fun v -> Hashtbl.find iop v.vertex_property) x.vertices
 
 let rec pp_v_list pe ppf = function
   | [] -> ()
@@ -189,9 +189,12 @@ let list_of_hash h =
   !r
 
 let pp_automaton ioc f x =
-  let pov = compute_pov x in
   let obs_p p = Hashtbl.find x.pattern_tags (Hashtbl.find x.observables p) in
-  let obs_tags = List.map obs_p (U.unique (get_properties x)) in
+  let iop = to_ints (get_properties x) in
+  let poi = inverse_index (fun p -> p) iop in
+  let pov =
+    Array.map (fun v -> Hashtbl.find iop v.vertex_property) x.vertices in
+  let obs_tags = Array.to_list (Array.map obs_p poi) in
   fprintf f "%a@\n" (pp_list pp_int) (starts x);
   fprintf f "%a@\n" (pp_list (pp_string_as_int ioc)) (errors x);
   fprintf f "%a@\n" (pp_array (pp_vertex x.pattern_tags ioc)) x.vertices;

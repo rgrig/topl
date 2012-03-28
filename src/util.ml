@@ -34,7 +34,7 @@ let map_option f xs =
 let cons x xs = x :: xs
 
 let unique l =
-  let h = Hashtbl.create 51 in
+  let h = Hashtbl.create 0 in
   List.iter (fun x -> Hashtbl.replace h x x) l;
   Hashtbl.fold (fun _ -> cons) h []
 

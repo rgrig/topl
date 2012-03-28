@@ -884,9 +884,9 @@ public class Checker {
                 }
             }
             observable = new boolean[filters.length][eventNames.length];
-            for (int f = 0; f < filters.length; f++) {
-                for (int e = 0; e < eventNames.length; e++) {
-                    observable[f][e] = true;
+            for (int f = 0; f < filters.length; ++f) {
+                for (int v = 0; v < filters[f].length; ++v) {
+                    observable[f][filters[f][v]] = true;
                 }
             }
             assert check();

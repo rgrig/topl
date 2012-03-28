@@ -501,6 +501,7 @@ let get_tag x =
     end else None
 
 let bc_send_call_event id param_types =
+  if log_ev then printf "@\n@[emit %d@]" id;
   let n = List.length (List.filter fst param_types) in
   let sz (t : B.Descriptor.for_parameter) =
     B.Descriptor.size (t :> B.Descriptor.java_type) in
@@ -514,6 +515,7 @@ let bc_send_call_event id param_types =
   @ bc_check
 
 let bc_send_return_event id return_type =
+  if log_ev then printf "@\n@[emit %d@]" id;
   let bc_save_return_value,
       return_arity,
       bc_store_return_value

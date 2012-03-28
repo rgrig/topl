@@ -584,11 +584,12 @@ public class Checker {
         final Treap<Binding> store;
         final Queue<Event> events;
 
-        // These keep a history for reporting traces. From the point of view
-        // of semantics of the automaton, two states that differ in their
-        // histories are essentially equivalent.
-        int time;  // length of the parent list
+        // History for trace reporting. Does not affect automaton semantics,
+        // so it's ignored by {@code equals}.
         Parent parent;
+
+        // How many transitions were taken to build this state.
+        int time;
 
         private State(int vertex, Treap<Binding> store, Queue<Event> events,
                 Parent parent) {
@@ -926,6 +927,9 @@ public class Checker {
     public boolean checkerEnabled = false;
     public int historyLength = 10;
 
+    private int totalStates = 0; // estimate, refreshed when doing GC
+    private int operations = 0; // estimate of work done since the last GC
+
     final private Automaton automaton;
     private HashSet<State> states;
 
@@ -1009,16 +1013,12 @@ public class Checker {
         }
     }
 
-    // Used for truncating traces.
-    private static void fixTimeOfState(State s) {
+    private static void unmarkAfterGc(State s) {
         assert s != null;
-        assert s.time == -1;
-        s.time = 1;
-        if (s.parent == null || s.parent.state.time != -1) {
-            s.parent = null;
-        } else {
-            fixTimeOfState(s.parent.state);
-            s.time += s.parent.state.time;
+        assert s.time < 0;
+        s.time = -s.time;
+        if (s.parent != null && s.parent.state.time < 0) {
+            unmarkAfterGc(s.parent.state);
         }
     }
 
@@ -1098,40 +1098,38 @@ public class Checker {
             }
         }
 
-        // Truncate traces.
-        boolean doGc = true;
-        for (State s : newActiveStates) {
-            if (s.time < 2 * historyLength) {
-                doGc = false;
-                break;
-            }
-        }
-        if (doGc) {
-            // Mark those to keep.
+        states = newActiveStates;
+
+        // Truncate traces (GC old states).
+        operations += states.size();
+        if (operations > 3 * totalStates) {
+            operations = totalStates = 0;
             ArrayDeque<State> p;
             ArrayDeque<State> q = new ArrayDeque<State>();
-            for (State s : newActiveStates) {
+            for (State s : states) {
                 q.addLast(s);
-                s.time = -1;
+                s.time = -s.time;
+                ++totalStates;
             }
             for (int i = 1; i < historyLength; ++i) {
                 p = q;
                 q = new ArrayDeque<State>();
                 for (State s : p) {
-                    if (s.parent != null && s.parent.state.time != -1) {
+                    if (s.parent != null && s.parent.state.time > 0) {
                         q.addLast(s.parent.state);
-                        s.parent.state.time = -1;
+                        s.parent.state.time = -s.parent.state.time;
+                        ++totalStates;
                     }
                 }
             }
-
-            // Update times and cut parent links.
-            for (State s : newActiveStates) {
-                fixTimeOfState(s);
+            for (State s : q) {
+                s.parent = null;
+            }
+            for (State s : states) {
+                unmarkAfterGc(s);
             }
         }
 
-        states = newActiveStates;
         checkerEnabled = true;
     }
     // }}}

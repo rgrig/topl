@@ -7,26 +7,52 @@
     body {
       font-family: serif;
       font-size: 16px;
+      width: 600px;
+      margin-left: auto;
+      margin-right: auto;
     }
-  #title {
-    font-family: sans-serif;
-    font-size: 100px;
-    font-weight: bold;
-    color: #500;
-  }
-  footer {
-    font-family: monospace;
-    font-size: 8px;
-    color: #aaa;
-  }
+    pre {
+      font-size: 12px;
+    }
+    #title {
+      font-family: sans-serif;
+      font-size: 100px;
+      font-weight: bold;
+      color: #500;
+    }
+    footer {
+      font-family: monospace;
+      font-size: 8px;
+      color: #aaa;
+    }
   </style>
 </head>
 <body>
 <div id="title">TOPL</div>
 
-<p><dfn>TOPL</dfn> is a language for specifying temporal properties of
-Java programs.</p>
+<p><dfn>TOPL</dfn> is a language for specifying temporal properties of Java
+programs.
+Its main design goal is simplicity.
+Users know how to use it immediately after seeing a couple of examples.</p>
 
-<footer>Last modified: 20 Feb 2012</footer>
+<pre>property NullInCollection
+  observe &lt;java.util.Collection.add&gt;
+  prefix &lt;java.util.Collection&gt;
+  start -&gt; start: *
+  start -&gt; error: *.add(null)</pre>
+
+<p>
+The theoretical underpinnings are based on <a href="http://scholar.google.co.uk/scholar?q=finite-memory+automata">finite-memory automata</a>.
+</p>
+
+<p>
+The command <code>toplc -i javaProjectDirectory properties.topl</code> instruments a Java project.
+The resulting bytecode reports to <code>stderr</code> if a property reaches the error state.
+</p>
+
+<footer>Last modified: 28 March 2012</footer>
 </body>
 </html>
+<!--
+vim:spell:wrap:
+-->

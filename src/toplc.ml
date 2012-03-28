@@ -577,10 +577,6 @@ let instrument_code call_id return_id param_types return_types code =
   let bc_send_ret_event = match return_id with
     | None -> []
     | Some id -> bc_send_return_event id return_types in
-(*
-  (bc_print (method_name ^ " : ")) @
-  (bc_print_utf8 (utf8_of_method_desc method_name param_types)) @
-*)
   put_labels_on bc_send_call_event @
   (add_return_code bc_send_ret_event code)
 

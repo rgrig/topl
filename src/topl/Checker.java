@@ -1023,10 +1023,22 @@ public class Checker {
     }
 
     public synchronized void check(Event event) {
-        if (!checkerEnabled) {
-            return;
+        try {
+            if (!checkerEnabled) {
+                return;
+            }
+            checkerEnabled = false;
+            internalCheck(event);
+            checkerEnabled = true;
+        } catch (Throwable t) {
+            System.err.println("TOPL: INTERNAL ERROR");
+            if (verbose) {
+                t.printStackTrace();
+            }
         }
-        checkerEnabled = false;
+    }
+
+    private void internalCheck(Event event) {
         if (logState) {
             boolean first = true;
             System.out.printf("States");
@@ -1129,8 +1141,6 @@ public class Checker {
                 unmarkAfterGc(s);
             }
         }
-
-        checkerEnabled = true;
     }
     // }}}
     // parsing {{{

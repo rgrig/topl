@@ -128,10 +128,6 @@ let errors x =
     | _ -> "null" in
   x.vertices >> Array.map f >> Array.to_list
 
-let compute_pov x =
-  let iop = to_ints (get_properties x) in
-  Array.map (fun v -> Hashtbl.find iop v.vertex_property) x.vertices
-
 let rec pp_v_list pe ppf = function
   | [] -> ()
   | [x] -> fprintf ppf "@\n%a" pe x
@@ -173,13 +169,6 @@ let pp_vertex tags ioc f v =
   fprintf f "%a %a"
     (pp_string_literal ioc) v.vertex_name
     (pp_list (pp_transition tags ioc)) v.outgoing_transitions
-
-let pp_event_name f pi pn =
-  fprintf f " %d %s" pi pn
-
-let pp_event_names f pns =
-  fprintf f "%d " (Hashtbl.length pns);
-  Hashtbl.iter (pp_event_name f) pns
 
 let list_of_hash h =
   let r = ref [] in
@@ -325,9 +314,6 @@ let utf8_for_class x = B.Name.make_for_class_from_external (utf8 x)
 let utf8_for_field x = B.Name.make_for_field (utf8 x)
 let utf8_for_method x = B.Name.make_for_method (utf8 x)
 let java_lang_Object = utf8_for_class "java.lang.Object"
-let java_lang_System = utf8_for_class "java.lang.System"
-let java_lang_String = utf8_for_class "java.lang.String"
-let java_io_PrintStream = utf8_for_class "java.io.PrintStream"
 let out = utf8_for_field "out"
 let println = utf8_for_method "println"
 let event = utf8_for_class "topl.Checker$Event"
@@ -374,15 +360,6 @@ let mk_method m =
   { method_name = bm_name m; method_arity = bm_arity m }
 
 (* bytecode generating helpers *) (* {{{ *)
-let bc_print_utf8 us = [
-  BI.GETSTATIC (`Fieldref (java_lang_System, out, `Class java_io_PrintStream));
-  BI.LDC (`String us);
-  BI.INVOKEVIRTUAL (`Methodref (`Class_or_interface java_io_PrintStream,
-			     println,
-			     ([`Class java_lang_String], `Void)));
-]
-let bc_print s = bc_print_utf8 (utf8 s)
-
 let bc_push = function
   | 0 -> BI.ICONST_0
   | 1 -> BI.ICONST_1
@@ -538,21 +515,6 @@ let bc_send_return_event id return_type =
   bc_store_return_value @
   (bc_new_event id) @
   bc_check
-
-(* Taken from disassembler.ml *)
-let (++) = B.UTF8Impl.(++)
-let space = B.UTF8Impl.of_string " "
-let comma = B.UTF8Impl.of_string ","
-let opening_parenthesis = B.UTF8Impl.of_string "("
-let closing_parenthesis = B.UTF8Impl.of_string ")"
-let utf8_of_method_desc name desc =
-  let params, return = desc in
-  (B.Descriptor.external_utf8_of_java_type return)
-    ++ space
-    ++ (B.Name.utf8_for_method name)
-    ++ opening_parenthesis
-    ++ (B.UTF8Impl.concat_sep_map comma B.Descriptor.external_utf8_of_java_type (params :> B.Descriptor.java_type list))
-    ++ closing_parenthesis
 
 let put_labels_on =
   List.map (fun x -> (BI.fresh_label (), x))

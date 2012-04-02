@@ -4,10 +4,8 @@ open Format
 open Util.Operators
 
 module B = BaristaLibrary
-module BA = B.HighClass.HighAttribute
-module BC = B.HighClass
-module BI = B.HighClass.HighInstruction
-module BM = B.HighClass.HighMethod
+module BC = BaristaLibrary.HighClass
+module BH = BaristaLibrary.HighTypes
 module PA = PropAst
 module SA = SoolAst
 module U = Util
@@ -327,11 +325,11 @@ let check = utf8_for_method "check"
 let bm_parameters c =
   let ts = List.map (fun x -> (true, x)) in
   function
-    | BM.Regular m ->
-        ts ((if List.mem `Static m.BM.flags then [] else [`Class c])
-        @ fst m.BM.descriptor)
-    | BM.Constructor m -> (false, `Class c) :: ts m.BM.cstr_descriptor
-    | BM.Initializer _ -> []
+    | BH.RegularMethod m ->
+        ts ((if List.mem `Static m.BH.rm_flags then [] else [`Class c])
+        @ fst m.BH.rm_descriptor)
+    | BH.InitMethod m -> (false, `Class c) :: ts m.BH.im_descriptor
+    | BH.ClinitMethod _ -> []
 
 let bm_arity m =
   let c = utf8_for_class "DummyClass943RB" in (* unique name, helps debuging *)
@@ -340,20 +338,22 @@ let bm_arity m =
   List.length ps
 
 let bm_return = function
-  | BM.Regular r -> snd r.BM.descriptor
-  | BM.Constructor _ | BM.Initializer _ -> `Void
+  | BH.RegularMethod r -> snd r.BH.rm_descriptor
+  | _ -> `Void
 
 let bm_name = function
-  | BM.Regular r -> B.Utils.UTF8.to_string (B.Name.utf8_for_method r.BM.name)
-  | BM.Constructor _ -> "<init>"
-  | BM.Initializer _ -> "<clinit>"
+  | BH.RegularMethod r ->
+      B.Utils.UTF8.to_string (B.Name.utf8_for_method r.BH.rm_name)
+  | BH.InitMethod _ -> "<init>"
+  | BH.ClinitMethod _ -> "<clinit>"
 
 let bm_map_attributes f = function
-  | BM.Regular r -> BM.Regular { r with BM.attributes = f r.BM.attributes }
-  | BM.Constructor c ->
-      BM.Constructor { c with BM.cstr_attributes = f c.BM.cstr_attributes }
-  | BM.Initializer i ->
-      BM.Initializer { i with BM.init_attributes = f i.BM.init_attributes }
+  | BH.RegularMethod r ->
+      BH.RegularMethod { r with BH.rm_attributes = f r.BH.rm_attributes }
+  | BH.InitMethod c ->
+      BH.InitMethod { c with BH.im_attributes = f c.BH.im_attributes }
+  | BH.ClinitMethod i ->
+      BH.ClinitMethod { i with BH.cm_attributes = f i.BH.cm_attributes }
 
 (* }}} *)
 let mk_method m =
@@ -361,18 +361,18 @@ let mk_method m =
 
 (* bytecode generating helpers *) (* {{{ *)
 let bc_push = function
-  | 0 -> BI.ICONST_0
-  | 1 -> BI.ICONST_1
-  | 2 -> BI.ICONST_2
-  | 3 -> BI.ICONST_3
-  | 4 -> BI.ICONST_4
-  | 5 -> BI.ICONST_5
-  | i -> BI.LDC (`Int (Int32.of_int i))
+  | 0 -> BH.ICONST_0
+  | 1 -> BH.ICONST_1
+  | 2 -> BH.ICONST_2
+  | 3 -> BH.ICONST_3
+  | 4 -> BH.ICONST_4
+  | 5 -> BH.ICONST_5
+  | i -> BH.LDC (`Int (Int32.of_int i))
 
 let bc_new_object_array size =
   [
     bc_push size;
-    BI.ANEWARRAY (`Class_or_interface java_lang_Object)
+    BH.ANEWARRAY (`Class_or_interface java_lang_Object)
   ]
 
 let bc_box = function
@@ -389,40 +389,40 @@ let bc_box = function
         | `Short -> "Short"
         | _ -> failwith "foo"))
         in
-      [BI.INVOKESTATIC (`Methodref
+      [BH.INVOKESTATIC (`Methodref
           (`Class_or_interface c,
 	  utf8_for_method "valueOf",
           ([t], `Class c)))]
 
 let bc_load i = function
-  | `Class _ | `Array _ -> BI.ALOAD i
-  | `Boolean -> BI.ILOAD i
-  | `Byte -> BI.ILOAD i
-  | `Char -> BI.ILOAD i
-  | `Double -> BI.DLOAD i
-  | `Float -> BI.FLOAD i
-  | `Int -> BI.ILOAD i
-  | `Long -> BI.LLOAD i
-  | `Short -> BI.ILOAD i
+  | `Class _ | `Array _ -> BH.ALOAD i
+  | `Boolean -> BH.ILOAD i
+  | `Byte -> BH.ILOAD i
+  | `Char -> BH.ILOAD i
+  | `Double -> BH.DLOAD i
+  | `Float -> BH.FLOAD i
+  | `Int -> BH.ILOAD i
+  | `Long -> BH.LLOAD i
+  | `Short -> BH.ILOAD i
 
 let bc_array_set l a t =
   let t = match t with
     | #B.Descriptor.for_parameter as t' -> t'
     | _ -> failwith "INTERNAL: trying to record a void" in
-  [ BI.DUP
+  [ BH.DUP
   ; bc_push a
   ; bc_load l t ]
   @ bc_box t
-  @ [ BI.AASTORE ]
+  @ [ BH.AASTORE ]
 
 let bc_new_event id =
   [
-    BI.NEW event;
-    BI.DUP_X1;
-    BI.SWAP;
+    BH.NEW event;
+    BH.DUP_X1;
+    BH.SWAP;
     bc_push id;
-    BI.SWAP;
-    BI.INVOKESPECIAL (`Methodref (`Class_or_interface event,
+    BH.SWAP;
+    BH.INVOKESPECIAL (`Methodref (`Class_or_interface event,
 			       init,
 			       ([`Int; `Array (`Class java_lang_Object)], `Void)
 			      ))
@@ -430,9 +430,9 @@ let bc_new_event id =
 
 let bc_check =
   [
-    BI.GETSTATIC (`Fieldref (property, property_checker, `Class checker));
-    BI.SWAP;
-    BI.INVOKEVIRTUAL (`Methodref (`Class_or_interface checker,
+    BH.GETSTATIC (`Fieldref (property, property_checker, `Class checker));
+    BH.SWAP;
+    BH.INVOKEVIRTUAL (`Methodref (`Class_or_interface checker,
 			       check,
 			       ([`Class event], `Void)
 			      ))
@@ -501,15 +501,15 @@ let bc_send_return_event id return_type =
       bc_store_return_value
    = match return_type with
     | `Void -> [], 0, []
-    | t -> [BI.DUP],
+    | t -> [BH.DUP],
            1,
-           [BI.DUP_X1;
-            BI.SWAP;
+           [BH.DUP_X1;
+            BH.SWAP;
             bc_push 0;
-            BI.SWAP] @
+            BH.SWAP] @
             (bc_box (B.Descriptor.filter_void
                 B.Descriptor.Invalid_method_parameter_type t)) @
-            [BI.AASTORE] in
+            [BH.AASTORE] in
   bc_save_return_value @
   (bc_new_object_array return_arity) @
   bc_store_return_value @
@@ -517,16 +517,16 @@ let bc_send_return_event id return_type =
   bc_check
 
 let put_labels_on =
-  List.map (fun x -> (BI.fresh_label (), x))
+  List.map (fun x -> (BC.fresh_label (), x))
 
 let rec add_return_code return_code = function
   | [] -> []
-  | ((_, BI.ARETURN) as r) :: xs
-  | ((_, BI.DRETURN) as r) :: xs
-  | ((_, BI.FRETURN) as r) :: xs
-  | ((_, BI.IRETURN) as r) :: xs
-  | ((_, BI.LRETURN) as r) :: xs
-  | ((_, BI.RETURN) as r) :: xs ->
+  | ((_, BH.ARETURN) as r) :: xs
+  | ((_, BH.DRETURN) as r) :: xs
+  | ((_, BH.FRETURN) as r) :: xs
+  | ((_, BH.IRETURN) as r) :: xs
+  | ((_, BH.LRETURN) as r) :: xs
+  | ((_, BH.RETURN) as r) :: xs ->
       put_labels_on return_code
         @ (r :: (add_return_code return_code xs))
   (* do not instrument RET or WIDERET *)
@@ -570,27 +570,29 @@ let instrument_method get_tag h c m =
     (bm_return m) in
   let ia xs =
     let f = function
-      | `Code c -> `Code { c with BA.code = ic c.BA.code }
+      | `Code c -> `Code { c with BH.cv_code = ic c.BH.cv_code }
       | a -> a in
     List.map f xs in
   bm_map_attributes ia m
 
 let pp_class f c =
-    fprintf f "@[%s@]" (B.Utils.UTF8.to_string (B.Name.internal_utf8_for_class c.BC.name))
+  let n = B.Name.internal_utf8_for_class c.BH.c_name in
+  fprintf f "@[%s@]" (B.Utils.UTF8.to_string n)
 
 let instrument_class get_tags h c =
   if log_cp then printf "@\n@[<2>begin instrument %a" pp_class c;
-  let instrumented_methods = List.map (instrument_method get_tags h c.BC.name) c.BC.methods in
+  let instrumented_methods =
+    List.map (instrument_method get_tags h c.BH.c_name) c.BH.c_methods in
   if log_cp then printf "@]@\nend instrument %a@\n" pp_class c;
-  {c with BC.methods = instrumented_methods}
+  {c with BH.c_methods = instrumented_methods}
 
 let compute_inheritance in_dir =
   let h = Hashtbl.create 0 in
   let record_class c =
-    let parents = match c.BC.extends with
-      | None -> c.BC.implements
-      | Some e -> e :: c.BC.implements in
-    Hashtbl.replace h c.BC.name parents
+    let parents = match c.BH.c_extends with
+      | None -> c.BH.c_implements
+      | Some e -> e :: c.BH.c_implements in
+    Hashtbl.replace h c.BH.c_name parents
   in
   ClassMapper.iter in_dir record_class;
   h

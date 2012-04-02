@@ -2,6 +2,7 @@ open Debug
 open Format
 
 module B = BaristaLibrary
+module BH = BaristaLibrary.HighTypes
 module F = Filename
 module U = Util
 
@@ -29,7 +30,7 @@ let open_class fn =
       | B.Version.Exception e ->
 	eprintf "@[dec %s: %s@." fn (B.Version.string_of_error e);
 	None
-      | B.HighClass.Exception e ->
+      | BH.Exception e ->
 	eprintf "@[dec %s: %s@." fn (B.HighClass.string_of_error e);
 	None
       | B.ClassFile.Exception e ->
@@ -58,7 +59,7 @@ let output_class version fn c =
     | B.Version.Exception e -> re (B.Version.string_of_error e)
     | B.Name.Exception e -> re (B.Name.string_of_error e)
     | B.AccessFlag.Exception e -> re (B.AccessFlag.string_of_error e)
-    | B.HighClass.Exception e -> re (B.HighClass.string_of_error e)
+    | BH.Exception e -> re (B.HighClass.string_of_error e)
     | Sys_error m -> re ("syserror: " ^ m)
     | _ -> re "unknown"
 

@@ -4,7 +4,7 @@ open Format
 open Util.Operators
 
 module B = BaristaLibrary
-module BC = BaristaLibrary.HighClass
+module BC = BaristaLibrary.Coder
 module BH = BaristaLibrary.HighTypes
 module PA = PropAst
 module SA = SoolAst

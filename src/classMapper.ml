@@ -22,7 +22,7 @@ let open_class fn =
     try
       let cl_in = B.InputStream.make_of_channel ch in
       let cf = B.ClassFile.read cl_in in
-      Some (B.HighClass.decode cf)
+      Some (B.Coder.decode cf)
     with
       | B.InputStream.Exception e ->
 	eprintf "@[dec %s: %s@." fn (B.InputStream.string_of_error e);
@@ -31,7 +31,7 @@ let open_class fn =
 	eprintf "@[dec %s: %s@." fn (B.Version.string_of_error e);
 	None
       | BH.Exception e ->
-	eprintf "@[dec %s: %s@." fn (B.HighClass.string_of_error e);
+	eprintf "@[dec %s: %s@." fn (B.Coder.string_of_error e);
 	None
       | B.ClassFile.Exception e ->
 	eprintf "@[dec %s: %s@." fn (B.ClassFile.string_of_error e);
@@ -51,7 +51,7 @@ let output_class version fn c =
     eprintf "@[enc %s: %s@]@\n" fn m;
     false in
   try
-    let bytes = B.HighClass.encode (c, version) in
+    let bytes = B.Coder.encode (c, version) in
     B.ClassFile.write bytes (B.OutputStream.make_of_channel ch);
     close_out ch;
     true
@@ -59,7 +59,7 @@ let output_class version fn c =
     | B.Version.Exception e -> re (B.Version.string_of_error e)
     | B.Name.Exception e -> re (B.Name.string_of_error e)
     | B.AccessFlag.Exception e -> re (B.AccessFlag.string_of_error e)
-    | BH.Exception e -> re (B.HighClass.string_of_error e)
+    | BH.Exception e -> re (B.Coder.string_of_error e)
     | Sys_error m -> re ("syserror: " ^ m)
     | _ -> re "unknown"
 

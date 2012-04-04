@@ -483,11 +483,9 @@ let get_tag x =
 let bc_send_call_event id param_types =
   if log_ev then printf "@\n@[emit %d@]" id;
   let n = List.length (List.filter fst param_types) in
-  let sz (t : B.Descriptor.for_parameter) =
-    B.Descriptor.size (t :> B.Descriptor.java_type) in
   let rec set l a ss = function
-    | (false, t) :: ts -> set (l + sz t) a ss ts
-    | (true, t) :: ts -> set (l + sz t) (succ a) (bc_array_set l a t :: ss) ts
+    | (false, _) :: ts -> set (succ l) a ss ts
+    | (true, t) :: ts -> set (succ l) (succ a) (bc_array_set l a t :: ss) ts
     | [] -> List.flatten ss in
   bc_new_object_array n
   @ set 0 0 [] param_types

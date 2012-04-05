@@ -1,4 +1,5 @@
 arity
+constructor
 fail
 longarg
 self

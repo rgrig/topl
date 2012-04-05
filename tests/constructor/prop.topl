@@ -1,0 +1,6 @@
+property leak
+  observe <*>
+  start -> start: *
+  start -> tracking: A := <A.\<init\>>[*]
+  tracking -> ok: a.<A.f>[*]
+  tracking -> error: return <Main.main>[*]

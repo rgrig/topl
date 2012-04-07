@@ -20,23 +20,12 @@
   let keyword =
     let table = Hashtbl.create 53 in
     List.iter (fun (k, v) -> Hashtbl.add table k v)
-      [ "and", AND
-      ; "call", CALL
-      ; "class", CLASS
-      ; "do", DO
-      ; "else", ELSE
-      ; "false", NUMBER 0
-      ; "if", IF
-      ; "main", MAIN
+      [ "call", CALL
       ; "message", MESSAGE
-      ; "new", NEW
       ; "observe", OBSERVE
-      ; "or", OR
       ; "prefix", PREFIX
       ; "property", PROPERTY
-      ; "return", RETURN
-      ; "var", VAR
-      ; "while", WHILE ];
+      ; "return", RETURN ];
     fun id -> l (try Hashtbl.find table id with Not_found -> ID id)
 
   let quoted = Str.regexp "\\\\\\(.\\)"
@@ -51,22 +40,14 @@ rule tok1 = parse
   | ((' '* (("//" | ';') [^ '\n']*)? '\n')+ as x) (' '* as y)
             { new_line x y lexbuf }
   | ' '+    { tok1 lexbuf }
-  | "/\\" | "&&"
-            { l AND }
   | "->"    { l ARROW }
   | ":="    { l ASGN }
   | ":"     { l COLON }
   | ','     { l COMMA }
   | '.'     { l DOT }
-  | "=="    { l EQ }
   | '['     { l LB }
   | '{'     { l LC }
   | '('     { l LP }
-  | "!="    { l NE }
-  | "¬" | "!"
-            { l NOT }
-  | "\\/" | "||"
-            { l OR }
   | ']'     { l RB }
   | '}'     { l RC }
   | ')'     { l RP }

@@ -1,6 +1,13 @@
-(* Rules for the properties. *)
-
 %{
+  open Debug
+  open Format
+
+  module PA = PropAst
+  module U = Util
+
+  type variable = string
+  type value = string
+
   type pattern =
     | Action of variable
     | GuardVar of variable
@@ -143,9 +150,42 @@
 
 %}
 
+%token <int> NUMBER
+%token <string> CONSTANT
+%token <string> ID
+%token <string> STRING
+%token ARROW
+%token ASGN
+%token CALL
+%token COLON
+%token COMMA
+%token DOT
+%token EOF
+%token LB
+%token LC
+%token LP
+%token MESSAGE
+%token OBSERVE
+%token PREFIX
+%token PROPERTY
+%token RB
+%token RC
+%token RETURN
+%token RP
+%token STAR
+
+%start <(string, string) PropAst.t PropAst.with_line list> properties
+
 %%
 
-%public property:
+properties:
+  | h=with_line(property) t=properties { h :: t }
+  | EOF { [] }
+
+with_line(X):
+    x=X { { PA.ast = x; PA.line = $startpos.Lexing.pos_lnum } }
+
+property:
   PROPERTY n=ID LC xs=item* RC
   { mk_property (fun () -> $syntaxerror) n xs }
 
@@ -217,9 +257,3 @@ any_value:
 
 %%
 
-(* TODO
-  - Generate loop on vertex start? It's not completely clear that we *always*
-    want it. We should record an example where it is not needed, or generate
-    the loop.
-  - Syntax highlight in various editors.
-*)

@@ -10,7 +10,7 @@ let parse fn =
   let lexbuf = Lexing.from_channel f in
   try
     let parse =
-      MenhirLib.Convert.Simplified.traditional2revised Parser.program in
+      MenhirLib.Convert.Simplified.traditional2revised Parser.properties in
     let r = parse (Lexer.token lexbuf) in
     close_in_noerr f;
     r

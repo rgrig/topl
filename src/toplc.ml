@@ -606,8 +606,7 @@ let compute_inheritance in_dir =
 (* main *) (* {{{ *)
 
 let read_properties fs =
-  let e p = List.map (fun x -> x.PA.ast) p.SoolAst.program_properties in
-  fs >> List.map Helper.parse >>= e
+  fs >> List.map Helper.parse >>= List.map (fun x -> x.PA.ast)
 
 exception Bad_arguments of string
 

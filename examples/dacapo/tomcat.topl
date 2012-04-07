@@ -48,7 +48,7 @@ property InterleavedResponse2
   sw -> sW: w.*
   s -> S: s.*
   sw -> Sw: s.*
-  W -> sW: r.getOutputStream()
-  S -> Sw: r.getWriter()
+  W -> sW: S := r.getOutputStream()
+  S -> Sw: W := r.getWriter()
   sW -> error: s.*
   Sw -> error: w.*

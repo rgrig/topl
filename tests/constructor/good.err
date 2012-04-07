@@ -1,3 +1,4 @@
+prop.topl:1: warning: unused state: ok
 TOPL: leak failed
   -> start: 
   -> start: call_main(obj[0])

@@ -923,9 +923,17 @@ public class Checker {
     }
     // }}}
     // checker {{{
-    public boolean verbose = false;
+    public enum SelectionStrategy {
+        RANDOM,
+        NEWEST,
+        OLDEST
+    };
+
+    public boolean verbose = false; // TODO: Use for call stack traces.
     public boolean checkerEnabled = false;
     public int historyLength = 10;
+    public int statesLimit = 10;
+    public SelectionStrategy selectionStrategy = SelectionStrategy.RANDOM;
 
     private int totalStates = 0; // estimate, refreshed when doing GC
     private int operations = 0; // estimate of work done since the last GC
@@ -1008,9 +1016,7 @@ public class Checker {
 
     void reportError(String msg, State errorState) {
         System.err.printf("TOPL: %s\n", msg);
-        if (verbose) {
-            printErrorTrace(errorState);
-        }
+        printErrorTrace(errorState);
     }
 
     private static void unmarkAfterGc(State s) {
@@ -1019,6 +1025,37 @@ public class Checker {
         s.time = -s.time;
         if (s.parent != null && s.parent.state.time < 0) {
             unmarkAfterGc(s.parent.state);
+        }
+    }
+
+    static Random random = new Random(123);
+
+    static <T> void swap(T[] a, int i, int j) {
+        T t = a[i];
+        a[i] = a[j];
+        a[j] = t;
+    }
+
+    // PRE: i < k ==> i <= j < k
+    // POST: a[i..j) <= a[j] <= a[j..k)
+    // VARIANT: k - i
+    private static void selectOldest(State[] a, int i, int j, int k) {
+        int ii, jj, kk;
+        if (i >= k) return;
+        jj = i + random.nextInt() % (k - i);
+        swap(a, i, jj);
+        for (ii = jj = kk = i + 1; kk < k; ++kk) {
+            // INV: a[ii..jj) <= a[i] < a[jj..kk)
+            if (a[kk].time <= a[i].time) {
+                swap(a, jj++, kk);
+            }
+        }
+        if (jj < k) {
+            if (j < jj) {
+                selectOldest(a, i, j, jj);
+            } else {
+                selectOldest(a, jj, j, k);
+            }
         }
     }
 
@@ -1032,9 +1069,7 @@ public class Checker {
             checkerEnabled = true;
         } catch (Throwable t) {
             System.err.println("TOPL: INTERNAL ERROR");
-            if (verbose) {
-                t.printStackTrace();
-            }
+            t.printStackTrace();
         }
     }
 
@@ -1112,6 +1147,35 @@ public class Checker {
 
         states = newActiveStates;
 
+        // Approximate.
+        if (states.size() > statesLimit) {
+            int i, from = 0;
+            State[] all = new State[states.size()];
+            i = 0;
+            for (State s : states) {
+                all[i++] = s;
+            }
+            states.clear();
+            switch (selectionStrategy) {
+                case RANDOM:
+                    from = random.nextInt() % (all.length - statesLimit + 1);
+                    break;
+                case OLDEST:
+                    from = 0;
+                    selectOldest(all, 0, statesLimit - 1, all.length);
+                    break;
+                case NEWEST:
+                    from = all.length - statesLimit;
+                    selectOldest(all, 0, from, all.length);
+                    break;
+                default:
+                    assert false;
+            }
+            for (i = from; i < from + statesLimit; ++i) {
+                states.add(all[i]);
+            }
+        }
+
         // Truncate traces (GC old states).
         operations += states.size();
         if (operations > 3 * totalStates) {
@@ -1123,7 +1187,7 @@ public class Checker {
                 s.time = -s.time;
                 ++totalStates;
             }
-            for (int i = 1; i < historyLength; ++i) {
+            for (int i = 0; i < historyLength; ++i) {
                 p = q;
                 q = new ArrayDeque<State>();
                 for (State s : p) {

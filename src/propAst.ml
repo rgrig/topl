@@ -29,17 +29,18 @@ type ('event_type, 'method_name, 'method_arity) tag =
   (* Common shape for [tag_guard] and [event_tag]. *)
 
 type 'method_name tag_guard =
-  ((event_type option), 'method_name, (int option)) tag
+  ((event_type option), 'method_name, (int * int option)) tag
 
 type ('method_name, 'value_guard) event_guard =
   { tag_guard : 'method_name tag_guard
   ; value_guards : 'value_guard list }
 
 let check_event_guard g =
-  let chk n = function Variable (_, m) | Constant (_, m) ->
-    assert (0 <= m && m < n) in
-  let chk_all n = List.iter (chk n) g.value_guards in
-  U.option () chk_all g.tag_guard.method_arity
+  let amin, amax = g.tag_guard.method_arity in
+  U.option () (fun amax -> assert (amin <= amax)) amax;
+  let chk = function
+    | Variable (_, m) | Constant (_, m) -> assert (m < amin) in
+  List.iter chk g.value_guards
 
 type 'variable action = ('variable * int) list
 

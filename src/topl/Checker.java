@@ -1066,6 +1066,7 @@ public class Checker {
             }
             checkerEnabled = false;
             internalCheck(event);
+//            System.out.printf("states %d\n", states.size()); // XXX
             checkerEnabled = true;
         } catch (Throwable t) {
             System.err.println("TOPL: INTERNAL ERROR");
@@ -1156,6 +1157,7 @@ public class Checker {
                 all[i++] = s;
             }
             states.clear();
+//            System.out.printf("removing %d states\n", states.size() - statesLimit); // XXX
             switch (selectionStrategy) {
                 case RANDOM:
                     from = random.nextInt() % (all.length - statesLimit + 1);

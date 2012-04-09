@@ -1,0 +1,13 @@
+property shouldFail
+  observe <*>
+  prefix <Main>
+  start -> start: *
+  start -> tracking: O := <\<init\>>[*]
+  tracking -> error: staticMethod()
+
+property shouldNotFail
+  observe <Main.{\<init\>,staticMethod}>
+  prefix <Main>
+  start -> start: *
+  start -> tracking: O := <\<init\>>[*]
+  tracking -> error: o.*

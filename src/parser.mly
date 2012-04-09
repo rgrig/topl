@@ -56,15 +56,19 @@
     r
 
   let mk_args_pattern a ps =
+    let arity = match a with None -> (0, None) | Some x -> (x, a) in
     { PA.tag_guard =
       { PA.event_type = None
       ; PA.method_name = ".*"
-      ; PA.method_arity = a }
+      ; PA.method_arity = arity }
     ; PA.value_guards = ps }
 
   let prepend_arg_guard g p =
     let io = function None -> None | Some x -> Some (succ x) in
-    let ia g = { g with PA.method_arity = io g.PA.method_arity } in
+    let ip (x, y) = (succ x, io y) in
+    let ia g =
+      { g with
+        PA.method_arity = ip g.PA.method_arity } in
     { PA.value_guards = g :: p.PA.value_guards
     ; PA.tag_guard = ia p.PA.tag_guard }
 
@@ -72,7 +76,7 @@
     { PA.tag_guard =
       { PA.event_type = None
       ; PA.method_name = ".*"
-      ; PA.method_arity = None }
+      ; PA.method_arity = (0, None) }
     ; PA.value_guards = [] }
 
   let mk_value_guards =
@@ -97,7 +101,6 @@
       if t = t' || t' = None || (t = None && (xgs <> [] || xas <> [])) then
         let g = PA.mk_event_guard
           { g.PA.tag_guard with PA.event_type = t' } xgs in
-        PA.check_event_guard g;
         [ { PA.guard = g; PA.action = xas } ]
       else [] in
     match mk (Some PA.Call) cgs cas @ mk (Some PA.Return) rgs ras with

@@ -288,7 +288,7 @@ let transform_properties ps =
     let obs_tag =
       { PA.event_type = None
       ; PA.method_name = p.PA.observable
-      ; PA.method_arity = None } in
+      ; PA.method_arity = (0, None) } in
     Hashtbl.replace full_p.pattern_tags obs_tag [];
     Hashtbl.replace full_p.observables p obs_tag in
   List.iter add_obs_tags ps;
@@ -470,18 +470,22 @@ let bc_emit id values = match id with
 
 let does_method_match
   ({ method_name=mn; method_arity=ma }, mt)
-  { PA.event_type=t; PA.method_name=re; PA.method_arity=a }
+  { PA.event_type=t; PA.method_name=re; PA.method_arity=(amin, amax) }
 =
-  let ba = U.option true ((=) ma) a in
+  let bamin = amin <= ma in
+  let bamax = U.option true ((<=) ma) amax in
   let bt = U.option true ((=) mt) t in
   let bn = PA.pattern_matches re mn in
-  let r = ba && bt && bn in
+  let r = bamin && bamax  && bt && bn in
   if log_mm then begin
     printf "@\n@[<2>%s " (if r then "✓" else "✗");
-    printf "(%a, %s, %d)@ matches (%a, %s, %a)@ gives (%b, %b, %b)@]"
+    printf "(%a, %s, %d)@ matches (%a, %s, [%d..%a])@ gives (%b, %b, (%b,%b))@]"
       PA.pp_event_type mt mn ma
-      (U.pp_option PA.pp_event_type) t re.PA.p_string (U.pp_option U.pp_int) a
-      bt bn ba
+      (U.pp_option PA.pp_event_type) t
+      re.PA.p_string
+      amin
+      (U.pp_option U.pp_int) amax
+      bt bn bamin bamax
   end;
   r
 

@@ -1,4 +1,5 @@
 arity
+arity-static
 constructor
 fail
 longarg

@@ -3,27 +3,44 @@
 <head>
   <title>TOPL</title>
   <meta http-equiv="Content-Type" content="text/html;charset=utf-8" >
+  <link
+    href="http://fonts.googleapis.com/css?family=Arvo:400,700,400italic"
+    rel="stylesheet"
+    type="text/css">
   <style>
     body {
-      font-family: serif;
+      font-family: 'Arvo', serif;
       font-size: 16px;
       width: 600px;
-      margin-left: auto;
-      margin-right: auto;
+      margin: auto;
     }
     pre {
+      font-family: 'Arvo', monospace;
       font-size: 12px;
+      background-color: #eee;
+      padding: 1ex 1em;
+    }
+    code {
+      font-family: 'Arvo', monospace;
+      background-color: #eee;
+      padding: .2ex .2em;
     }
     #title {
       font-family: sans-serif;
       font-size: 100px;
       font-weight: bold;
-      color: #500;
+      color: #222;
     }
     footer {
       font-family: monospace;
       font-size: 8px;
       color: #aaa;
+    }
+    a {
+      color: #000;
+    }
+    a:hover {
+      background-color: #ddf;
     }
   </style>
 </head>
@@ -39,7 +56,7 @@ Users know how to use it immediately after seeing a couple of examples.</p>
   observe &lt;java.util.Collection.add&gt;
   prefix &lt;java.util.Collection&gt;
   start -&gt; start: *
-  start -&gt; error: *.add(null)</pre>
+  start -&gt; error: *.add(&lt;null&gt;)</pre>
 
 <p>
 The theoretical underpinnings are based on <a href="http://scholar.google.co.uk/scholar?q=finite-memory+automata">finite-memory automata</a>.
@@ -50,7 +67,7 @@ The command <code>toplc -i javaProjectDirectory properties.topl</code> instrumen
 The resulting bytecode reports to <code>stderr</code> if a property reaches the error state.
 </p>
 
-<footer>Last modified: 28 March 2012</footer>
+<footer>Last modified: 10 April 2012</footer>
 </body>
 </html>
 <!--

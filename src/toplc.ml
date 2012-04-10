@@ -601,8 +601,7 @@ let compute_inheritance in_dir =
     let parents = match c.BH.c_extends with
       | None -> c.BH.c_implements
       | Some e -> e :: c.BH.c_implements in
-    Hashtbl.replace h c.BH.c_name parents
-  in
+    Hashtbl.replace h c.BH.c_name parents in
   ClassMapper.iter in_dir record_class;
   h
 

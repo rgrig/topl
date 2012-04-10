@@ -1,0 +1,7 @@
+property TeeOutputStream1
+  message "TeeOutputStream is used from more than one thread"
+  observe <org.dacapo.harness.TeeOutputStream.*>
+  start -> start: *
+  start -> inCall: call X.*
+  inCall -> ok: return *
+  inCall -> error: call x.*

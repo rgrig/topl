@@ -1,0 +1,15 @@
+//property Fail
+//  observe <org.eclipse.core.*>
+//  start -> start: *
+//  start -> error: *
+
+property HistoryObserverNotNotified
+  message "A registered IOperationHistoryListener was not notified."
+  observe <org.eclipse.core.{IOperationHistory,IOperationHistoryListener}.*>
+  prefix <org.eclipse.core.IOperationHistory>
+  start -> start: *
+  start -> registered: H.addOperationHistoryListener(L)
+  registered -> removed: h.removeOperationHistoryListener(l)
+  registered -> inAdd: call h.add[1]
+  inAdd -> error: return h.add[1]
+  inAdd -> registered: l.*

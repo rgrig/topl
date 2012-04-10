@@ -933,7 +933,7 @@ public class Checker {
     public boolean checkerEnabled = false;
     public int historyLength = 10;
     public int statesLimit = 10;
-    public SelectionStrategy selectionStrategy = SelectionStrategy.RANDOM;
+    public SelectionStrategy selectionStrategy = SelectionStrategy.NEWEST;
 
     private int totalStates = 0; // estimate, refreshed when doing GC
     private int operations = 0; // estimate of work done since the last GC
@@ -1066,7 +1066,6 @@ public class Checker {
             }
             checkerEnabled = false;
             internalCheck(event);
-//            System.out.printf("states %d\n", states.size()); // XXX
             checkerEnabled = true;
         } catch (Throwable t) {
             System.err.println("TOPL: INTERNAL ERROR");
@@ -1157,7 +1156,6 @@ public class Checker {
                 all[i++] = s;
             }
             states.clear();
-//            System.out.printf("removing %d states\n", states.size() - statesLimit); // XXX
             switch (selectionStrategy) {
                 case RANDOM:
                     from = random.nextInt() % (all.length - statesLimit + 1);
@@ -1176,6 +1174,7 @@ public class Checker {
             for (i = from; i < from + statesLimit; ++i) {
                 states.add(all[i]);
             }
+            assert states.size() == statesLimit;
         }
 
         // Truncate traces (GC old states).

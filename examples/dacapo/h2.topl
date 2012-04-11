@@ -1,0 +1,13 @@
+// The documentation of org.h2.index.Cursor says:
+// "The cursor is initially positioned before the first row, that means
+//  next() must be called before accessing data."
+property RowAccessBeforeNext
+  message "A cursor was trying to access a row before having called next"
+  observe <org.h2.index.Cursor.{\<init\>,next,get,getSearchRow}>
+  prefix <org.h2.index>
+  prefix <org.h2.index.Cursor>
+  start -> start: *
+  start -> tracking: C := <Cursor.\<init\>>[*]
+  tracking -> ok: <true> := c.next()
+  tracking -> error: call c.get()
+  tracking -> error: call c.getSearchRow()

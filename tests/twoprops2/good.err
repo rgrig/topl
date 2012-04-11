@@ -1,7 +1,7 @@
 TOPL: gNok failed
   -> start: 
-  -> error: call g()
+  -> error: call Main.g()
 TOPL: gNok failed
   -> start: 
-  -> start: call g()
-  -> error: return g()
+  -> start: call Main.g()
+  -> error: return Main.g()

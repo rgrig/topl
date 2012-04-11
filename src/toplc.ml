@@ -586,11 +586,15 @@ let rec get_ancestors h c =
   ga c;
   U.hashtbl_fold_keys (fun c cs -> c :: cs) cs []
 
+let name_of_class c =
+  B.Utils.UTF8.to_string (B.Name.external_utf8_for_class c)
+
+let mk_full_method_name c mn =
+  name_of_class c ^ "." ^ mn
+
 let get_overrides h c m =
   let ancestors = get_ancestors h c in
-  let uts = B.Utils.UTF8.to_string in
-  let cts c = uts (B.Name.external_utf8_for_class c) in
-  let qualify c =  (cts c) ^ "." ^ m.method_name in
+  let qualify c =  mk_full_method_name c m.method_name in
   (List.map qualify ancestors, m.method_arity)
 
 let instrument_method get_tag h c m =
@@ -598,10 +602,11 @@ let instrument_method get_tag h c m =
   let arguments = bm_parameters c m in
   let method_arity = List.length arguments in
   let overrides = get_overrides h c {method_name; method_arity} in
+  let full_method_name = mk_full_method_name c method_name in
   let ic = instrument_code
     (bm_is_init m)
-    (get_tag PA.Call overrides method_name)
-    (get_tag PA.Return overrides method_name)
+    (get_tag PA.Call overrides full_method_name)
+    (get_tag PA.Return overrides full_method_name)
     arguments
     (bm_return c m)
     (bm_locals_count m) in

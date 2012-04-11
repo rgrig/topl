@@ -1,10 +1,10 @@
 prop.topl:1: warning: unused state: ok
 TOPL: leak failed
   -> start: 
-  -> start: call main(obj[0])
-  -> start: call <init>()
-  -> start: return <init>(obj[1])
-  -> start: call f(obj[1])
-  -> start: call <init>()
-  -> tracking: return <init>(obj[2])
-  -> error: return main()
+  -> start: call Main.main(obj[0])
+  -> start: call Main.<init>()
+  -> start: return Main.<init>(obj[1])
+  -> start: call Main.f(obj[1])
+  -> start: call A.<init>()
+  -> tracking: return A.<init>(obj[2])
+  -> error: return Main.main()

@@ -528,6 +528,7 @@ public class Checker {
     public static class Event {
         final int id;
         final Object[] values;
+        StackTraceElement[] callStack;
 
         public Event(int id, Object[] values) {
             this.id = id;
@@ -536,6 +537,7 @@ public class Checker {
         }
 
         boolean check() {
+            assert 0 <= id;
             assert values != null;
             return true;
         }
@@ -929,11 +931,15 @@ public class Checker {
         OLDEST
     };
 
-    public boolean verbose = false; // TODO: Use for call stack traces.
+    // These should be printed by [Toplc.pp_constants_table], to make
+    // them easily accessible to users.
+    public boolean captureCallStacks = false;
     public boolean checkerEnabled = false;
     public int historyLength = 10;
     public int statesLimit = 10;
     public SelectionStrategy selectionStrategy = SelectionStrategy.NEWEST;
+
+    private Throwable throwable = new Throwable();
 
     private int totalStates = 0; // estimate, refreshed when doing GC
     private int operations = 0; // estimate of work done since the last GC
@@ -990,6 +996,21 @@ public class Checker {
             }
             System.err.printf("%s", automaton.eventNames[e.id]);
             printValues(e.values);
+        }
+        first = true;
+        for (Event e : events) {
+            if (e.callStack == null) {
+                continue;
+            }
+            if (first) {
+                System.err.println();
+                first = false;
+            } else {
+                System.err.println("       -- ; --");
+            }
+            for (int i = 1; i < e.callStack.length; ++i) {
+                System.err.printf("       %s\n", e.callStack[i].toString());
+            }
         }
     }
 
@@ -1065,6 +1086,9 @@ public class Checker {
                 return;
             }
             checkerEnabled = false;
+            if (captureCallStacks) {
+                event.callStack = throwable.fillInStackTrace().getStackTrace();
+            }
             internalCheck(event);
             checkerEnabled = true;
         } catch (Throwable t) {

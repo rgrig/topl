@@ -89,12 +89,12 @@ let pp_string f s = fprintf f "%s" s
 
 let pp_int f x = fprintf f "%d" x
 
-let pp_list pp_sep pp_element =
-  let rec f = fun pp_f -> function
+let pp_list sep pp_element =
+  let rec pp = fun f -> function
     | [] -> ()
-    | [x] -> pp_element pp_f x
-    | x :: xs -> fprintf pp_f "@[%a@]%s@,%a" pp_element x pp_sep f xs in
-  f
+    | [x] -> pp_element f x
+    | x :: xs -> fprintf f "@[%a@]%s@," pp_element x sep; pp f xs in
+  pp
 
 let pp_option pp_e ppf = function
   | None -> fprintf ppf "None"

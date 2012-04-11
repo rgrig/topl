@@ -134,7 +134,7 @@ let errors x =
 let rec pp_v_list pe ppf = function
   | [] -> ()
   | [x] -> fprintf ppf "@\n%a" pe x
-  | x :: xs -> fprintf ppf "@\n%a,%a" pe x (pp_v_list pe) xs
+  | x :: xs -> fprintf ppf "@\n%a," pe x; pp_v_list pe ppf xs
 
 let pp_int f x = fprintf f "%d" x
 let pp_string f x = fprintf f "%s" x
@@ -177,7 +177,7 @@ let pp_vertex tags index f v =
 let list_of_hash h =
   let r = ref [] in
   for i = Hashtbl.length h - 1 downto 0 do
-    r := (try Some (Hashtbl.find h i) with Not_found -> None):: !r
+    r := (try Some (Hashtbl.find h i) with Not_found -> None) :: !r
   done;
   !r
 
@@ -237,7 +237,12 @@ let pp_constants_table j i =
   fprintf j "@\n@[<2>public static final Checker checker =@ ";
   fprintf j   "Checker.Parser.checker(%a,@ %a,@ constants);@]"
     pp_ext "text"  pp_ext "strings";
-  fprintf j "@\n@[<2>static {@\nchecker.checkerEnabled = true;@]@\n}";
+  fprintf j "@\n@[<2>static {";
+  fprintf j   "@\nchecker.checkerEnabled = true;";
+  fprintf j   "@\nchecker.historyLength = 10;";
+  fprintf j   "@\nchecker.statesLimit = 10;";
+  fprintf j   "@\nchecker.captureCallStacks = false;";
+  fprintf j "@]@\n}";
   fprintf j "@]@\n}@]"
 
 let pp_strings_nonl f index =
@@ -688,7 +693,7 @@ let () =
   with
     | Bad_arguments m
     | Helper.Parsing_failed m
-(*     | Sys_error m *)
-        -> eprintf "@[ERROR: %s@." m; printf "@."
+    | Sys_error m
+        -> eprintf "@[ERROR: %s@." m
 
 (* }}} *)

@@ -11,3 +11,37 @@ property RowAccessBeforeNext
   tracking -> ok: <true> := c.next()
   tracking -> error: call c.get()
   tracking -> error: call c.getSearchRow()
+
+// The comment on org.h2.result.ResultExternal says
+//   "This method is called after all rows have been added."
+property AddingToResultAfterDone
+  message "ResultExternal.add() was called after ResultExternal.done()"
+  observe <org.h2.result.ResultExternal.{add,done}>
+  prefix <org.h2.result.ResultExternal>
+  start -> start: *
+  start -> done: R.done[*]
+  done -> error: r.add[*]
+
+// The comment on org.h2.api.DatabaseEventListener.init says:
+//   "This method is called just after creating the object."
+// I assume this means the database object.
+property DatabaseOpenBeforeInit
+  message "Database opened before being created?"
+  observe <org.h2.api.DatabaseEventListener.{init,opened,closingDatabase}>
+  prefix <org.h2.api.DatabaseEventListener>
+  start -> start: *
+  start -> opened: L.opened()
+  opened -> ok: l.closingDatabase()
+  opened -> error: l.init(*)
+
+// The class org.h2.constant.SysProperties assumes that the system properties
+// it reads are not changed after it (the class) is loaded.
+property LatePropertyChange
+  message "System property change is invisible to SysProperties"
+  observe <java.lang.System.setProperty>
+  observe <org.h2.constant.SysProperties.\<clinit\>>
+  prefix <java.lang>
+  prefix <org.h2.constant>
+  start -> start: <System.setProperty>[*]
+  start -> loaded: <SysProperties.\<clinit\>>[*]
+  loaded -> error: <System.setProperty>[*] // This should be more specific

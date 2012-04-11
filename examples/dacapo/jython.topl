@@ -1,0 +1,12 @@
+property NestedMethods
+  message "Trying to construct nested methods."
+  observe <org.python.expose.generate.Exposer,{startConstructor,endConstructor}>
+  observe <org.python.expose.generate.Exposer,{startMethod,endMethod}>
+  prefix <org.python.expose.generate.Exposer>
+  start -> start: *
+  start -> generatingConstructor: E.startConstructor[*]
+  generatingConstructor -> ok: e.endConstructor[*]
+  start -> generatingMethod: E.startMethod[*]
+  generatingMethod -> ok: e.endMethod[*]
+  generatingConstructor -> error: e.startConstructor[*], e.startMethod[*]
+  generatingMethod -> error: e.startConstructor[*], e.startMethod[*]

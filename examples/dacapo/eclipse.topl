@@ -1,15 +1,30 @@
-//property Fail
-//  observe <org.eclipse.core.*>
-//  start -> start: *
-//  start -> error: *
+// Methods that should lead to informing Listener
+//    add(), closeOperation(), openOperation(), operationChanged(),
+//    replaceOperation()
+// Methods that inform listener only if some operation is approved
+//    execute(), redo(), undo(), undoOperation()
+// Approvers are added and removed.
 
-property HistoryObserverNotNotified
+// Listeners
+//    addOperationHistoryListener, removeOperationHistoryListener
+
+// Approvers
+//    addOperationApprover(), removeOperationApprover()
+
+property HistoryObserver1
   message "A registered IOperationHistoryListener was not notified."
-  observe <org.eclipse.core.{IOperationHistory,IOperationHistoryListener}.*>
-  prefix <org.eclipse.core.IOperationHistory>
+  observe <org.eclipse.core.IOperationHistory.{add,closeOperation,openOperation,operationChanged,replaceOperation,addOperationHistoryListener,removeOperationHistoryListener}>
+  observe <org.eclipse.core.IOperationHistoryListener.historyNotification>
+  prefix <org.eclipse.core.{IOperationHistory,IOperationHistoryListener}>
   start -> start: *
   start -> registered: H.addOperationHistoryListener(L)
   registered -> removed: h.removeOperationHistoryListener(l)
-  registered -> inAdd: call h.add[1]
-  inAdd -> error: return h.add[1]
-  inAdd -> registered: l.*
+  registered -> shouldNotify: call h.add[*], call h.closeOperation[*], call h.openOperation[*], call h.operationChanged[*], call h.replaceOperation[*]
+  shouldNotify -> error: return h.add[*], return h.closeOperation[*], return h.openOperation[*], return h.operationChanged[*], return h.replaceOperation[*]
+  shouldNotify -> registered: l.*
+  // What if another thread removes a listener
+  // after add() is called, but before it returns.
+  // Is it then OK for the listener not to be informed?
+
+property HistoryObserver2
+  message

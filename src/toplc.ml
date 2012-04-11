@@ -105,6 +105,15 @@ let get_vertices p =
 (* }}} *)
 (* pretty printing to Java *) (* {{{ *)
 
+type 'a pp_index =
+  { to_int : 'a -> int
+  ; of_int : int -> 'a
+  ; count : int }
+
+type pp_full_index =
+  { idx_constant : value pp_index
+  ; idx_string : string pp_index }
+
 let array_foldi f z xs =
   let r = ref z in
   for i = 0 to Array.length xs - 1 do r := f !r i xs.(i) done;
@@ -116,15 +125,10 @@ let starts x =
     | _ -> ks in
   array_foldi f [] x.vertices
 
-(* TODO(rgrig): Escape properly. *)
-let mk_java_string_literal s =
-  Printf.sprintf "\"%s\"" s
-
 let errors x =
   let f = function
-    | {vertex_name="error"; vertex_property={PA.message=e;_};_} ->
-        mk_java_string_literal e
-    | _ -> "null" in
+    | {vertex_name="error"; vertex_property={PA.message=e;_};_} -> Some e
+    | _ -> None in
   x.vertices >> Array.map f >> Array.to_list
 
 let rec pp_v_list pe ppf = function
@@ -134,90 +138,114 @@ let rec pp_v_list pe ppf = function
 
 let pp_int f x = fprintf f "%d" x
 let pp_string f x = fprintf f "%s" x
-let pp_string_as_int ios f s = pp_int f (Hashtbl.find ios s)
-let pp_string_literal ios f s =
-  pp_string_as_int ios f (mk_java_string_literal s)
+let pp_constant_as_int i f c = pp_int f (i.idx_constant.to_int c)
+let pp_string_as_int i f s =
+  let v = (match s with None -> (-1) | Some s -> i.idx_string.to_int s) in
+  pp_int f v
 let pp_list pe f x =
   fprintf f "@[<2>%d@ %a@]" (List.length x) (U.pp_list " " pe) x
 let pp_array pe f x = pp_list pe f (Array.to_list x)
 
-let pp_value_guard ioc f = function
+let pp_value_guard index f = function
   | PA.Variable (v, i) -> fprintf f "0 %d %d" i v
-  | PA.Constant (c, i) -> fprintf f "1 %d %a" i (pp_string_as_int ioc) c
+  | PA.Constant (c, i) -> fprintf f "1 %d %a" i (pp_constant_as_int index) c
 
 let pp_pattern tags f p =
   fprintf f "%a" (pp_list pp_int) (Hashtbl.find tags p)
 
-let pp_condition ioc = pp_list (pp_value_guard ioc)
+let pp_condition index = pp_list (pp_value_guard index)
 
 let pp_assignment f (x, i) =
   fprintf f "%d %d" x i
 
-let pp_guard tags ioc f { PA.tag_guard = p; PA.value_guards = cs } =
-  fprintf f "%a %a" (pp_pattern tags) p (pp_condition ioc) cs
+let pp_guard tags index f { PA.tag_guard = p; PA.value_guards = cs } =
+  fprintf f "%a %a" (pp_pattern tags) p (pp_condition index) cs
 
 let pp_action = pp_list pp_assignment
 
-let pp_step tags ioc f { PA.guard = g; PA.action = a } =
-  fprintf f "%a %a" (pp_guard tags ioc) g pp_action a
+let pp_step tags index f { PA.guard = g; PA.action = a } =
+  fprintf f "%a %a" (pp_guard tags index) g pp_action a
 
-let pp_transition tags ioc f { steps = ss; target = t } =
-  fprintf f "%a %d" (pp_list (pp_step tags ioc)) ss t
+let pp_transition tags index f { steps = ss; target = t } =
+  fprintf f "%a %d" (pp_list (pp_step tags index)) ss t
 
-let pp_vertex tags ioc f v =
+let pp_vertex tags index f v =
   fprintf f "%a %a"
-    (pp_string_literal ioc) v.vertex_name
-    (pp_list (pp_transition tags ioc)) v.outgoing_transitions
+    (pp_string_as_int index) (Some v.vertex_name)
+    (pp_list (pp_transition tags index)) v.outgoing_transitions
 
 let list_of_hash h =
   let r = ref [] in
   for i = Hashtbl.length h - 1 downto 0 do
-    r := Hashtbl.find h i :: !r
+    r := (try Some (Hashtbl.find h i) with Not_found -> None):: !r
   done;
   !r
 
-let pp_automaton ioc f x =
+let pp_automaton index f x =
   let obs_p p = Hashtbl.find x.pattern_tags (Hashtbl.find x.observables p) in
   let iop = to_ints (get_properties x) in
-  let poi = inverse_index (fun p -> p) iop in
+  let poi = inverse_index U.id iop in
   let pov =
     Array.map (fun v -> Hashtbl.find iop v.vertex_property) x.vertices in
   let obs_tags = Array.to_list (Array.map obs_p poi) in
   fprintf f "%a@\n" (pp_list pp_int) (starts x);
-  fprintf f "%a@\n" (pp_list (pp_string_as_int ioc)) (errors x);
-  fprintf f "%a@\n" (pp_array (pp_vertex x.pattern_tags ioc)) x.vertices;
+  fprintf f "%a@\n" (pp_list (pp_string_as_int index)) (errors x);
+  fprintf f "%a@\n" (pp_array (pp_vertex x.pattern_tags index)) x.vertices;
   fprintf f "%a@\n" (pp_array pp_int) pov;
   fprintf f "%a@\n" (pp_list (pp_list pp_int)) obs_tags;
   fprintf f "%a@\n"
-    (pp_list (pp_string_literal ioc)) (list_of_hash x.event_names)
+    (pp_list (pp_string_as_int index)) (list_of_hash x.event_names)
 
-let index_constants p =
-  let r = Hashtbl.create 0 in (* maps constants to their index *)
-  let i = ref (-1) in
-  let add c = if not (Hashtbl.mem r c) then Hashtbl.add r c (incr i; !i) in
-  let add_js s = add (mk_java_string_literal s) in
-  let value_guard = function PA.Constant (c, _) -> add c | _ -> () in
+let mk_pp_index p =
+  let mk () =
+    let m = Hashtbl.create 0 in
+    let c = ref (-1) in
+    let add x = if not (Hashtbl.mem m x) then Hashtbl.add m x (incr c; !c) in
+    add, m, c in
+  let mk_idx m c =
+    { to_int = Hashtbl.find m
+    ; of_int = (let a = inverse_index U.id m in fun i -> a.(i))
+    ; count = succ !c } in
+  let add_c, ioc, cc = mk () in
+  let add_s, ios, sc = mk () in
+  let value_guard = function PA.Constant (c, _) -> add_c c | _ -> () in
   let event_guard g = List.iter value_guard g.PA.value_guards in
   let label l = event_guard l.PA.guard in
   let transition t = List.iter label t.steps in
   let vertex_data v =
-    add_js v.vertex_name; List.iter transition v.outgoing_transitions in
+    add_s v.vertex_name; List.iter transition v.outgoing_transitions in
   Array.iter vertex_data p.vertices;
-  U.hashtbl_fold_values (fun en () -> add_js en) p.event_names ();
-  List.iter add (errors p);
-  r
+  U.hashtbl_fold_values (fun en () -> add_s en) p.event_names ();
+  List.iter (function None -> () | Some s -> add_s s) (errors p);
+  { idx_constant = mk_idx ioc cc
+  ; idx_string = mk_idx ios sc }
 
-let pp_constants j constants =
-  let constants = Array.to_list constants in
+let pp_constants_table j i =
+  let constants =
+    let rec ct n =
+      if n = i.idx_constant.count
+      then []
+      else i.idx_constant.of_int n :: ct (succ n) in
+    ct 0 in
+  let pp_ext f e =
+    fprintf f "@[\"topl\"@ + java.io.File.separator@ + \"Property.%s\"" e in
   fprintf j "@[";
   fprintf j "package topl;@\n";
   fprintf j "@[<2>public class Property {";
   fprintf j "@\n@[<2>public static final Object[] constants =@ ";
   fprintf j   "new Object[]{%a@]};" (pp_v_list pp_string) constants;
   fprintf j "@\n@[<2>public static final Checker checker =@ ";
-  fprintf j   "Checker.Parser.checker(\"topl\" + java.io.File.separator + \"Property.text\",@ constants);@]";
+  fprintf j   "Checker.Parser.checker(%a,@ %a,@ constants);@]"
+    pp_ext "text"  pp_ext "strings";
   fprintf j "@\n@[static { checker.checkerEnabled = true; }@]";
   fprintf j "@]@\n}@]"
+
+let pp_strings_nonl f index =
+  for i = 0 to pred index.idx_string.count do
+    let s = index.idx_string.of_int i in
+    assert (not (String.contains s '\n'));
+    Printf.fprintf f "%s\n" s
+  done
 
 let generate_checkers out_dir p =
   check_automaton p;
@@ -230,11 +258,12 @@ let generate_checkers out_dir p =
     let f = formatter_of_out_channel c in
     (c, f) in
   let (jc, j), (tc, t) = o "java", o "text" in
-  let ioc = index_constants p in
-  let coi = inverse_index (fun x -> x) ioc in
-  fprintf j "@[%a@." pp_constants coi;
-  fprintf t "@[%a@." (pp_automaton ioc) p;
-  List.iter close_out_noerr [jc; tc];
+  let sc = open_out (topl_dir/"Property.strings") in
+  let index = mk_pp_index p in
+  fprintf j "@[%a@." pp_constants_table index;
+  pp_strings_nonl sc index;
+  fprintf t "@[%a@." (pp_automaton index) p;
+  List.iter close_out_noerr [jc; tc; sc];
   ignore (Sys.command
     (Printf.sprintf
       "javac -sourcepath %s %s"
@@ -493,7 +522,7 @@ let get_tag x =
   let cnt = ref (-1) in
   fun t (mns, ma) mn ->
     let en = (* event name *)
-      fprintf str_formatter "%a_%s" PA.pp_event_type t mn;
+      fprintf str_formatter "%a %s" PA.pp_event_type t mn;
       flush_str_formatter () in
     let fp p acc =
       let cm mn = does_method_match ({method_name=mn; method_arity=ma}, t) p in

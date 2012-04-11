@@ -4,6 +4,8 @@ type ('a, 'b) either = Left of 'a | Right of 'b
 
 let either a b = function Left x -> a x | Right x -> b x
 
+let id x = x
+
 let from_option a = function None -> a | Some a -> a
 
 let option d f = function

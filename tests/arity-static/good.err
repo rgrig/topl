@@ -1,6 +1,6 @@
 TOPL: shouldFail failed
   -> start: 
-  -> start: call_main(obj[0])
-  -> start: call_<init>()
-  -> tracking: return_<init>(obj[1])
-  -> error: call_staticMethod()
+  -> start: call main(obj[0])
+  -> start: call <init>()
+  -> tracking: return <init>(obj[1])
+  -> error: call staticMethod()

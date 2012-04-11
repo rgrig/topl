@@ -1,7 +1,7 @@
 TOPL: NothingHappens failed
   -> start: 
-  -> error: call_main(obj[0])
+  -> error: call main(obj[0])
 TOPL: NothingHappens failed
   -> start: 
-  -> start: call_main(obj[0])
-  -> error: return_main()
+  -> start: call main(obj[0])
+  -> error: return main()

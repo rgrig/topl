@@ -1211,18 +1211,30 @@ public class Checker {
     // parsing {{{
     public static class Parser {
         final Scanner scan;
+        final String[] strings;
         final Object[] constants;
 
-        Parser(Scanner scan, Object[] constants) {
+        Parser(Scanner scan, String[] strings, Object[] constants) {
             this.scan = scan;
+            this.strings = strings;
             this.constants = constants;
         }
 
         /** Returns {@code null} if something goes wrong. */
-        public static Checker checker(String filename, Object[] constants) {
+        public static Checker checker(
+                String automatonFile, String stringsFile, Object[] constants) {
             try {
-                Scanner scan = new Scanner(ClassLoader.getSystemResourceAsStream(filename));
-                return new Checker(new Parser(scan, constants).automaton());
+                ArrayDeque<String> strings = new ArrayDeque<String>();
+                Scanner scan = new Scanner(
+                        ClassLoader.getSystemResourceAsStream(stringsFile));
+                while (scan.hasNextLine()) {
+                    strings.addLast(scan.nextLine());
+                }
+                scan = new Scanner(
+                        ClassLoader.getSystemResourceAsStream(automatonFile));
+                String[] stringsArray = strings.toArray(new String[0]);
+                return new Checker(new Parser(scan, stringsArray, constants)
+                        .automaton());
             } catch (Exception e) { // method is used as a static initializer
                 e.printStackTrace();
                 return null;
@@ -1307,7 +1319,12 @@ public class Checker {
         }
 
         String oneString() {
-            return (String) constants[scan.nextInt()];
+            int n = scan.nextInt();
+            if (n < 0) {
+                return null;
+            } else {
+                return strings[n];
+            }
         }
 
         String[] strings() {

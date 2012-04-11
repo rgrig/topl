@@ -1,7 +1,7 @@
 TOPL: gNok failed
   -> start: 
-  -> error: call_g()
+  -> error: call g()
 TOPL: gNok failed
   -> start: 
-  -> start: call_g()
-  -> error: return_g()
+  -> start: call g()
+  -> error: return g()

@@ -15,7 +15,6 @@ let errors = ref []
 
 let warn p m = warnings := (sprintf "@[%s: warning: %s@]" p m) :: !warnings
 let error p c m = errors := (sprintf "@[%s: %s: %s@]" p c m) :: !errors
-let fatal p c m = error p c m; raise Error
 
 let location = ref "<INTERNAL ERROR>" (* user should not see this *)
 let set_location = function
@@ -89,6 +88,7 @@ let bound_variables p =
   let m = ref (U.StringMap.add "start" U.StringSet.empty U.StringMap.empty) in
   let now, nxt = ref (U.StringSet.singleton "start"), ref U.StringSet.empty in
   for i = 2 to count_states p do begin
+    ignore i;
     let relax e =
       let s, t = get_source e, get_target e in
       nxt := U.StringSet.add t !nxt;

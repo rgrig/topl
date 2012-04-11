@@ -1,13 +1,13 @@
 TOPL: shouldFail failed
   -> start: 
-  -> start: call_main(obj[0])
-  -> start: call_<init>()
-  -> start: return_<init>(obj[1])
-  -> error: call_f(obj[1],1)
+  -> start: call main(obj[0])
+  -> start: call <init>()
+  -> start: return <init>(obj[1])
+  -> error: call f(obj[1],1)
 TOPL: shouldFail failed
   -> start: 
-  -> start: call_main(obj[0])
-  -> start: call_<init>()
-  -> start: return_<init>(obj[1])
-  -> start: call_f(obj[1],1)
-  -> error: return_f()
+  -> start: call main(obj[0])
+  -> start: call <init>()
+  -> start: return <init>(obj[1])
+  -> start: call f(obj[1],1)
+  -> error: return f()

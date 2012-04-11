@@ -1,5 +1,5 @@
 prop.topl:1: warning: unused state: ok
-TOPL: leak failed
+TOPL: leak
   -> start: 
   -> start: call Main.main(obj[0])
   -> start: call Main.<init>()

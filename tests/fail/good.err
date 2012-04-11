@@ -1,7 +1,7 @@
-TOPL: NothingHappens failed
+TOPL: NothingHappens
   -> start: 
   -> error: call Main.main(obj[0])
-TOPL: NothingHappens failed
+TOPL: NothingHappens
   -> start: 
   -> start: call Main.main(obj[0])
   -> error: return Main.main()

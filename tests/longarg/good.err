@@ -1,4 +1,4 @@
-TOPL: shouldFail failed
+TOPL: shouldFail
   -> start: 
   -> start: call Main.main(obj[0])
   -> start: call Main.<init>()

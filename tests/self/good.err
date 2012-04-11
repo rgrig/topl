@@ -2,7 +2,7 @@ TOPL: A new Treap was computed on the basis of an older-than-current one.
   -> start: 
   -> start: call Treap.insert(obj[0],"Radu")
   -> start: call Treap.insert(obj[0],-1188957731,"Radu")
-  -> current: return Treap.insert(obj[1])
+  -> start: return Treap.insert(obj[1])
   -> current: return Treap.insert(obj[1])
   -> old: call Treap.insert(obj[1],"Dino")
   -> error: call Treap.insert(obj[1],1018954901,"Dino")
@@ -10,7 +10,7 @@ TOPL: A new Treap was computed on the basis of an older-than-current one.
   -> start: 
   -> start: call Treap.insert(obj[0],"Radu")
   -> start: call Treap.insert(obj[0],-1188957731,"Radu")
-  -> start: return Treap.insert(obj[1])
+  -> current: return Treap.insert(obj[1])
   -> current: return Treap.insert(obj[1])
   -> old: call Treap.insert(obj[1],"Dino")
   -> error: call Treap.insert(obj[1],1018954901,"Dino")

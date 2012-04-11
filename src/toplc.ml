@@ -228,7 +228,7 @@ let pp_constants_table j i =
       else i.idx_constant.of_int n :: ct (succ n) in
     ct 0 in
   let pp_ext f e =
-    fprintf f "@[\"topl\"@ + java.io.File.separator@ + \"Property.%s\"" e in
+    fprintf f "@[\"topl\"@ + java.io.File.separator@ + \"Property.%s\"@]" e in
   fprintf j "@[";
   fprintf j "package topl;@\n";
   fprintf j "@[<2>public class Property {";
@@ -237,7 +237,7 @@ let pp_constants_table j i =
   fprintf j "@\n@[<2>public static final Checker checker =@ ";
   fprintf j   "Checker.Parser.checker(%a,@ %a,@ constants);@]"
     pp_ext "text"  pp_ext "strings";
-  fprintf j "@\n@[static { checker.checkerEnabled = true; }@]";
+  fprintf j "@\n@[<2>static {@\nchecker.checkerEnabled = true;@]@\n}";
   fprintf j "@]@\n}@]"
 
 let pp_strings_nonl f index =
@@ -487,7 +487,7 @@ let bc_emit id values = match id with
   | None -> []
   | Some id ->
       let rec set j acc = function
-        | (i, t) :: ts -> set (succ i) (bc_array_set i j t :: acc) ts
+        | (i, t) :: ts -> set (succ j) (bc_array_set i j t :: acc) ts
         | [] -> List.concat acc in
       List.concat
         [ bc_new_object_array (List.length values)

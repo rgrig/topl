@@ -1,10 +1,10 @@
-TOPL: shouldFail failed
+TOPL: shouldFail
   -> start: 
   -> start: call Main.main(obj[0])
   -> start: call Main.<init>()
   -> start: return Main.<init>(obj[1])
   -> error: call Main.f(obj[1],1)
-TOPL: shouldFail failed
+TOPL: shouldFail
   -> start: 
   -> start: call Main.main(obj[0])
   -> start: call Main.<init>()

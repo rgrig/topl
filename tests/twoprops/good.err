@@ -1,19 +1,19 @@
-TOPL: f failed
+TOPL: f
   -> start: 
   -> start: call Main.main(obj[0])
   -> error: call Main.f()
-TOPL: g failed
+TOPL: g
   -> start: 
   -> start: call Main.main(obj[0])
   -> start: call Main.f()
   -> error: call Main.g()
-TOPL: g failed
+TOPL: g
   -> start: 
   -> start: call Main.main(obj[0])
   -> start: call Main.f()
   -> start: call Main.g()
   -> error: return Main.g()
-TOPL: f failed
+TOPL: f
   -> start: 
   -> start: call Main.main(obj[0])
   -> start: call Main.f()

@@ -118,7 +118,7 @@
     U.map_option (function I_transitions x -> Some x | _ -> None) xs
 
   let extract_message e n = function
-    | [] -> sprintf "@[%s failed@]" n
+    | [] -> n
     | [m] -> m
     | _ ->
         eprintf "@[ERROR: Property %s has more than one message.@." n; e ()

@@ -4,6 +4,7 @@ package topl;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayDeque;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
@@ -43,7 +44,7 @@ public class Checker {
     // }}}
     // Queue<T> {{{
     static class Queue<T> implements Iterable<T> {
-        private T a, b; // inv: a != null || b == null
+        final public T a, b; // inv: a != null || b == null
         private int hash;
         Queue(T a, T b) {
             assert a != null || b == null;
@@ -93,7 +94,11 @@ public class Checker {
         @Override
         public boolean equals(Object other) {
             Queue otherQueue = (Queue) other; // yes, exception wanted
-            return a == otherQueue.a && b == otherQueue.b;
+            return
+                (a == null && otherQueue.a == null)
+                || (a.equals(otherQueue.a) &&
+                        ((b == null && otherQueue.b == null)
+                        || b.equals(otherQueue.b)));
         }
         private class Itr implements Iterator<T> {
             int state;
@@ -124,124 +129,6 @@ public class Checker {
             return sb.toString();
         }
     }
-    /*
-    static class Queue<T> implements Iterable<T> {
-        static private class N<T> {
-            T data;
-            N<T> next;
-            int size;
-            private N(T data, N<T> next, int size) {
-                this.data = data;
-                this.next = next;
-                this.size = size;
-            }
-            static <T> N<T> mk(T data, N<T> next) {
-                return new N<T>(data, next, 1 + sizeN(next));
-            }
-        }
-        static private <T> N<T> reverseN(N<T> n) {
-            N<T> r;
-            for (r = null; n != null; n = n.next) {
-                r = N.mk(n.data, r);
-            }
-            return r;
-        }
-        static private <T> int sizeN(N<T> n) {
-            return n == null? 0 : n.size;
-        }
-        private N<T> front;
-        private N<T> back;
-        private int hash;
-
-        // not fail-fast
-        private class Itr implements Iterator<T> {
-            N<T> next;
-            boolean frontDone = false;
-
-            Itr() {
-                next = front;
-                maybeSwap();
-            }
-
-            private void maybeSwap() {
-                if (next == null && !frontDone) {
-                    next = reverseN(back);
-                    frontDone = true;
-                }
-            }
-
-            @Override
-            public boolean hasNext() {
-                return next != null;
-            }
-
-            @Override
-            public T next() {
-                T r = next.data;
-                next = next.next;
-                maybeSwap();
-                return r;
-            }
-            @Override
-            public void remove() {
-                throw new UnsupportedOperationException();
-            }
-        }
-
-        private Queue(N<T> front, N<T> back, int hash) {
-            this.front = front;
-            this.back = back;
-            this.hash = hash;
-        }
-        static private <T> Queue<T> mk(N<T> front, N<T> back, int hash) {
-            return new Queue<T>(front, back, hash);
-        }
-        static <T> Queue<T> empty() {
-            return new Queue<T>(null, null, 0);
-        }
-        private void maybeSwap() {
-            if (front == null) {
-                front = reverseN(back);
-                back = null;
-            }
-        }
-        public Queue<T> push(T x) {
-            assert x != null;
-            return Queue.mk(front, N.mk(x, back), hash + x.hashCode());
-        }
-        public Queue<T> pop() {
-            maybeSwap();
-            if (front == null) {
-                throw new RuntimeException("queue empty");
-            }
-            return Queue.mk(front.next, back, hash - front.data.hashCode());
-        }
-        public T top() {
-            maybeSwap();
-            if (front == null) {
-                throw new RuntimeException("queue empty");
-            }
-            return front.data;
-        }
-        public int size() {
-            return sizeN(front) + sizeN(back);
-        }
-        @Override
-        public Iterator<T> iterator() {
-            return new Itr();
-        }
-        @Override
-        public int hashCode() {
-            return hash;
-        }
-        @Override
-        public boolean equals(Object other) {
-            Queue otherQueue = (Queue) other; // yes, exception wanted
-            return this == otherQueue ||
-                (hash == otherQueue.hash &&
-                equalIterators(iterator(), otherQueue.iterator()));
-        }
-    }*/
     // }}}
     // Treap<T extends Comparable<T>> {{{
     static class Treap<T extends Comparable<T>> implements Iterable<T> {
@@ -529,14 +416,38 @@ public class Checker {
         final int id;
         final Object[] values;
 
+        final int hash;
+        StackTraceElement[] callStack;
+
         public Event(int id, Object[] values) {
             this.id = id;
             this.values = values;
+            this.hash = id + Arrays.hashCode(values);
             assert check();
         }
 
         boolean check() {
+            assert 0 <= id;
             assert values != null;
+            return true;
+        }
+
+        @Override
+        public int hashCode() {
+            return hash;
+        }
+
+        @Override
+        public boolean equals(Object other) {
+            Event otherEvent = (Event) other;
+            if (id != otherEvent.id || values.length != otherEvent.values.length) {
+                return false;
+            }
+            for (int i = 0; i < values.length; ++i) {
+                if (!valueEquals(values[i], otherEvent.values[i])) {
+                    return false;
+                }
+            }
             return true;
         }
     }
@@ -929,11 +840,15 @@ public class Checker {
         OLDEST
     };
 
-    public boolean verbose = false; // TODO: Use for call stack traces.
+    // These should be printed by [Toplc.pp_constants_table], to make
+    // them easily accessible to users.
+    public boolean captureCallStacks = false;
     public boolean checkerEnabled = false;
     public int historyLength = 10;
     public int statesLimit = 10;
     public SelectionStrategy selectionStrategy = SelectionStrategy.NEWEST;
+
+    private Throwable throwable = new Throwable();
 
     private int totalStates = 0; // estimate, refreshed when doing GC
     private int operations = 0; // estimate of work done since the last GC
@@ -990,6 +905,21 @@ public class Checker {
             }
             System.err.printf("%s", automaton.eventNames[e.id]);
             printValues(e.values);
+        }
+        first = true;
+        for (Event e : events) {
+            if (e.callStack == null) {
+                continue;
+            }
+            if (first) {
+                System.err.println();
+                first = false;
+            } else {
+                System.err.println("       -- ; --");
+            }
+            for (int i = 1; i < e.callStack.length; ++i) {
+                System.err.printf("       %s\n", e.callStack[i].toString());
+            }
         }
     }
 
@@ -1065,6 +995,9 @@ public class Checker {
                 return;
             }
             checkerEnabled = false;
+            if (captureCallStacks) {
+                event.callStack = throwable.fillInStackTrace().getStackTrace();
+            }
             internalCheck(event);
             checkerEnabled = true;
         } catch (Throwable t) {
@@ -1072,6 +1005,8 @@ public class Checker {
             t.printStackTrace();
         }
     }
+
+    private static Queue<Event> noEvent = Queue.empty();
 
     private void internalCheck(Event event) {
         if (logState) {
@@ -1103,40 +1038,46 @@ public class Checker {
             }
             boolean anyEnabled = false;
             for (Transition transition : automaton.transitions[state.vertex]) {
-//DBG System.out.print("try " + state.vertex + " -> " + transition.target //DBG
-//DBG         + " with events");                                          //DBG
-//DBG for (Event e : state.events) System.out.print(" " + e.id);          //DBG
-//DBG System.out.println();                                               //DBG
-                // evaluate transition
-                Treap<Binding> store = state.store;
+                // Evaluate transition.
+                // NOTE: Performance here matters a lot.
+                TransitionStep[] steps = transition.steps;
                 Queue<Event> events = state.events;
-                Queue<Event> consumed = Queue.empty();
-                int i;
-                for (i = 0; i < transition.steps.length; ++i) {
-                    TransitionStep step = transition.steps[i];
-                    Event stepEvent = events.top();
-                    events = events.pop();
-                    consumed = consumed.push(stepEvent);
-                    if (!step.evaluateGuard(stepEvent, store)) {
-                        break;
+                assert 0 < steps.length;
+                assert steps.length <= 2;
+                assert steps.length <= events.size();
+                assert events.size() <= 2;
+                Treap<Binding> store = state.store;
+                if (!steps[0].evaluateGuard(events.a, store)) {
+                    continue;
+                }
+                store = steps[0].action.apply(events.a, store);
+                if (steps.length == 2) {
+                    if (!steps[1].evaluateGuard(events.b, store)) {
+                        continue;
                     }
-//DBG System.out.println("step"); //DBG
-                    store = step.action.apply(stepEvent, store);
+                    store = steps[1].action.apply(events.b, store);
                 }
 
-                // record transition
-                if (i == transition.steps.length) {
-//DBG System.out.println("tran"); //DBG
-                    anyEnabled = true;
-                    State newState = State.make(transition.target, store,
-                                                events, consumed, state);
-                    newActiveStates.add(newState);
+                // Figure out the consumed events and the remaining ones.
+                Queue<Event> consumed, remaining;
+                if (steps.length == events.size()) {
+                    consumed = events;
+                    remaining = noEvent;
+                } else {
+                    assert steps.length == 1;
+                    consumed = noEvent.push(events.top());
+                    remaining = events.pop();
+                }
 
-                    // check for error state
-                    String msg = automaton.errorMessages[transition.target];
-                    if (msg != null) {
-                        reportError(msg, newState);
-                    }
+                // Record the transition.
+                anyEnabled = true;
+                State newState = State.make(transition.target, store,
+                                            remaining, consumed, state);
+                newActiveStates.add(newState);
+
+                String msg = automaton.errorMessages[transition.target];
+                if (msg != null) {
+                    reportError(msg, newState);
                 }
             }
             if (!anyEnabled) {

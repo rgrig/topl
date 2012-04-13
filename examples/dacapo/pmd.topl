@@ -1,0 +1,50 @@
+property AddingChildrenToClosedNode
+  observe <net.sourceforge.pmd.ast.Node.{jjtOpen,jjtClose,jjtAddChild,\<init\>}>
+  prefix <net.sourceforge.pmd.ast.Node>
+  start -> start: *
+  start -> tracking: N := <\<init\>>[*]
+  tracking -> opened: n.jjtOpen()
+  opened -> closed: n.jjtClose();
+  tracking -> error: n.jjtAddChild[*]
+  closed -> error: n.jjtAddChild[*]
+
+// The following two should share a template.
+
+property RuleStartCalledTwice
+  message "net.sourceforge.pmd.Rule.start should be called at most once"
+  observe <net.sourceforge.pmd.Rule.start>
+  prefix <net.sourceforge.pmd.Rule>
+  start -> start: *
+  start -> tracking: R.start[*]
+  tracking -> error: r.start[*]
+
+property RuleEndCalledTwice
+  message "net.sourceforge.pmd.Rule.end should be called at most once"
+  observe <net.sourceforge.pmd.Rule.end>
+  prefix <net.sourceforge.pmd.Rule>
+  start -> start: *
+  start -> tracking: R.end[*]
+  tracking -> error: r.end[*]
+
+property RuleApplyBeforeStart
+  observe <net.sourceforge.pmd.Rule.{\<init\>,start,apply}>
+  prefix <net.sourceforge.pmd.Rule>
+  start -> start: *
+  start -> tracking: R := <\<init\>>[*]
+  tracking -> ok: r.start[*]
+  tracking -> error: r.apply[*]
+
+property RuleApplyAfterEnd
+  observe <net.sourceforge.pmd.Rule.{end,apply}>
+  prefix <net.sourceforge.pmd.Rule>
+  start -> start: *
+  start -> ended: R.end[*]
+  ended -> error: r.apply[*]
+
+// Approximation: The exact property needs sets.
+property AskingScopeAboutUnknownOccurrence
+  observe <net.sourceforge.pmd.Scope.{contains,addVariableNameOccurrence}>
+  prefix <net.sourceforge.pmd.Scope>
+  start -> start: *
+  start -> unknown: <false> := S.contains(N)
+  unknown -> error: s.addVariableNameOccurrence(n)

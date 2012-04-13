@@ -1,3 +1,9 @@
+// For debug
+// property AlwaysFails
+//   observe <org.apache.batik.*>
+//   start -> start: *
+//   start -> error: *
+
 // The documentation of org.w3c.dom.events.Event says:
 // "The <code>initEvent</code> method is used to initialize the value of 
 //  an <code>Event</code> created through the 
@@ -7,7 +13,9 @@
 property InitAfterDispatch
   message "An event was initialized after it had been dispatched"
   observe <org.w3c.dom.events.{Event.initEvent,EventTarget.dispatchEvent}>
+  observe <org.apache.batik.dom.events.*>
   prefix <org.w3c.dom.events>
+  prefix <org.apache.batik.dom.events>
   start -> start: *
   start -> tracking: *.<EventTarget.dispatchEvent>(E)
   tracking -> error: call e.<Event.initEvent>[3]

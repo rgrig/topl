@@ -18,8 +18,6 @@
     body {
       font-family: 'Arvo', serif;
       font-size: 16px;
-      width: 600px;
-      margin: auto;
     }
     pre {
       font-family: 'Arvo', monospace;
@@ -56,9 +54,21 @@
     a:hover {
       background-color: #ddf;
     }
+
+    @-webkit-keyframes appear {
+      from { color:white; }
+      to { color:black; }
+    }
+    #overview-details {
+      -webkit-animation-duration: 3s;
+    }
   </style>
 </head>
 <body>
+<script>
+document.body.style.marginLeft=Math.max(0,(innerWidth-600)/2)+'px';
+document.body.style.width='600px';
+</script>
 <header>
   <div id="title">TOPL</div>
   <div id="tagline">monitor Java programs, easy
@@ -84,7 +94,9 @@ Here is where TOPL comes in.
 
 <script>
 function showOverviewDetails() {
-  document.getElementById("overview-details").style.display='block';
+  var txt = document.getElementById("overview-details");
+  txt.style.display="block";
+  txt.style.webkitAnimationName="appear";
   document.getElementById("read-more").innerHTML="";
 }
 </script>
@@ -118,9 +130,9 @@ This disadvantage is important when (1)&nbsp;the checks must always be active, e
 <p>Be aware that the implementation is in very early stages.</p>
 
 <ol>
-<li>Obtain the <code>toplc</code> executable:
+<li>Get it, using one of the following:
   <ul>
-  <li><a href="https://github.com/downloads/rgrig/topl/toplc-linux32-201205">linux 32b</a>
+  <li><a href="https://github.com/downloads/rgrig/topl/topl-201205.tar.bz2">bz2 with linux binary</a>
   <li><a href="http://github.com/rgrig/topl">clone</a> and compile yourself
   </ul>
 

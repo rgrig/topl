@@ -1,7 +1,7 @@
 property TeeOutputStream1
-  message "TeeOutputStream is used from more than one thread"
-  observe <org.dacapo.harness.TeeOutputStream.*>
+  message "TeeOutputStream.write is not atomic"
+  observe <org.dacapo.harness.TeeOutputStream.{write,closeLog}>
   start -> start: *
-  start -> inCall: call X.*
-  inCall -> ok: return *
+  start -> inCall: call X.write[*]
+  inCall -> ok: return *.write[*]
   inCall -> error: call x.*

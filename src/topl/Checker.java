@@ -50,12 +50,7 @@ public class Checker {
             assert a != null || b == null;
             this.a = a;
             this.b = b;
-            if (a != null) {
-                hash = a.hashCode();
-                if (b != null) {
-                    hash += b.hashCode();
-                }
-            }
+            this.hash = -1;
         }
         static private <T> Queue<T> mk(T a, T b) {
             return new Queue<T>(a, b);
@@ -89,6 +84,16 @@ public class Checker {
         }
         @Override
         public int hashCode() {
+            if (hash == -1) {
+                hash = 0;
+                if (a != null) {
+                    hash += a.hashCode();
+                    if (b != null) {
+                        hash += hashCode();
+                    }
+                }
+                // If unlucky, hash might be -1 here.
+            }
             return hash;
         }
         @Override
@@ -1352,9 +1357,4 @@ public class Checker {
     private static boolean logTreap = false;
     // }}}
 }
-/* TODO {{{
-    - do *NOT* use any Java libraries
-    - write some tests
-    - add 'final' where possible
-}}} */
 // vim:sts=4:sw=4:ts=8:et:

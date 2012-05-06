@@ -256,8 +256,7 @@ let generate_checkers out_dir p =
   check_automaton p;
   let (/) = Filename.concat in
   U.cp_r (Config.topl_dir/"src"/"topl") out_dir;
-  let topl_dir = out_dir/"src"/"topl" in
-  U.mkdir_p topl_dir;
+  let topl_dir = out_dir/"topl" in
   let o n =
     let c = open_out (topl_dir/("Property." ^ n)) in
     let f = formatter_of_out_channel c in

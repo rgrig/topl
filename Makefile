@@ -9,19 +9,16 @@ OCAMLBUILD=ocamlbuild -use-ocamlfind -cflags $(OCFLAGS)
 
 default: native
 
-byte: src/config.ml
+byte:
 	@$(OCAMLBUILD) $(BYTES)
 	ln -sf toplc.byte toplc
 
-native: src/config.ml
+native:
 	@$(OCAMLBUILD) $(NATIVES)
 	ln -sf toplc.native toplc
 
 test: default
 	@cd tests; ./test -c
-
-src/config.ml:
-	echo "let src_dir = \"$(CURDIR)/src\"" > src/config.ml
 
 checker:
 	@mkdir -p classes

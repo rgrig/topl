@@ -249,3 +249,19 @@ let is_prefix s t =
   let m, n = (String.length s, String.length t) in
   let rec f i j = i = m || (j < n && s.[i] = t.[j] && f (succ i) (succ j)) in
   f 0 0
+
+let binary_path =
+  let try_dir d () = Filename.concat d Sys.argv.(0) in
+  let split =
+    let sep = Str.regexp (if Sys.os_type = "Unix" then ":" else ";") in
+    fun ds -> Str.split sep ds in
+  let fs () =
+    [ (fun () -> Unix.readlink "/proc/self/exe")
+    ; (fun () -> Unix.readlink "/proc/curproc/file")
+    ; (fun () -> Sys.getenv "_")
+    ; (fun () -> Sys.argv.(0)) ]
+    @ List.map try_dir (split (Sys.getenv "PATH")) in
+  let left f g =
+    try let r = f () in if Sys.file_exists r then Some r else raise Not_found
+    with _ -> g in
+  fun () -> List.fold_right left (fs ()) None

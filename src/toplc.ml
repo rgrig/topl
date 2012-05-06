@@ -255,8 +255,8 @@ let pp_strings_nonl f index =
 let generate_checkers out_dir p =
   check_automaton p;
   let (/) = Filename.concat in
-  U.cp_r (Config.src_dir/"topl") out_dir;
-  let topl_dir = out_dir/"topl" in
+  U.cp_r (Config.topl_dir/"src"/"topl") out_dir;
+  let topl_dir = out_dir/"src"/"topl" in
   U.mkdir_p topl_dir;
   let o n =
     let c = open_out (topl_dir/("Property." ^ n)) in
@@ -650,10 +650,8 @@ let compute_inheritance in_dir =
 let read_properties fs =
   fs >> List.map Helper.parse >>= List.map (fun x -> x.PA.ast)
 
-exception Bad_arguments of string
-
 let check_work_directory d =
-  let e = Bad_arguments ("Bad work directory: " ^ d) in
+  let e = Arg.Bad ("Bad work directory: " ^ d) in
   try
     let here = Unix.getcwd () in
     let dir = Filename.concat here d in
@@ -670,14 +668,17 @@ let () =
     let in_dir = ref None in
     let out_dir = ref None in
     let set_dir r v = match !r with
-      | Some _ -> raise (Bad_arguments "Repeated argument.")
+      | Some _ -> raise (Arg.Bad "Repeated argument.")
       | None -> r := Some v in
     Arg.parse
       [ "-i", Arg.String (set_dir in_dir), "input directory"
       ; "-o", Arg.String (set_dir out_dir), "output directory" ]
       (fun x -> fs := x :: !fs)
       usage;
-    if !in_dir = None then raise (Bad_arguments "Missing input directory.");
+    if !in_dir = None then begin
+      eprintf "@[Missing input directory.@\n%s@." usage;
+      exit 2;
+    end;
     if !out_dir = None then out_dir := !in_dir;
     let in_dir, out_dir = U.from_some !in_dir, U.from_some !out_dir in
     let tmp_dir = U.temp_path "toplc_" in
@@ -691,7 +692,6 @@ let () =
     U.rename tmp_dir out_dir;
     printf "@."
   with
-    | Bad_arguments m
     | Helper.Parsing_failed m
     | Sys_error m
         -> eprintf "@[ERROR: %s@." m

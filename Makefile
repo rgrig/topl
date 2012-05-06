@@ -27,6 +27,6 @@ checker:
 clean:
 	@$(OCAMLBUILD) -clean
 	@rm -rf classes
-	@rm -f toplc src/config.ml
+	@rm -f toplc
 
 .PHONY: byte checker clean default native test

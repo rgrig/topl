@@ -234,14 +234,21 @@ let pp_constants_table j i =
   fprintf j "@[<2>public class Property {";
   fprintf j "@\n@[<2>public static final Object[] constants =@ ";
   fprintf j   "new Object[]{%a@]};" (pp_v_list pp_string) constants;
-  fprintf j "@\n@[<2>public static final Checker checker =@ ";
-  fprintf j   "Checker.Parser.checker(%a,@ %a,@ constants);@]"
-    pp_ext "text"  pp_ext "strings";
+  fprintf j "@\npublic static Checker checker = null;";
   fprintf j "@\n@[<2>static {";
-  fprintf j   "@\nchecker.checkerEnabled = true;";
   fprintf j   "@\nchecker.historyLength = 10;";
   fprintf j   "@\nchecker.statesLimit = 10;";
   fprintf j   "@\nchecker.captureCallStacks = false;";
+  fprintf j "@]@\n}";
+  fprintf j "@\n@[<2>static void check(Event event) {";
+  fprintf j   "@\n@[<2>if (checker != null) {";
+  fprintf j     "@\nchecker.check(event);";
+  fprintf j   "@]@\n}";
+  fprintf j "@]@\n}";
+  fprintf j "@\n@[<2>static void start() {";
+  fprintf j   "@\n@[<2>if (checker == null) {";
+  fprintf j     "@[<2>checker =@ Checker.Parser.checker(%a,@ %a,@ constants);@]" pp_ext "text"  pp_ext "strings";
+  fprintf j   "@]@\n}";
   fprintf j "@]@\n}";
   fprintf j "@]@\n}@]"
 
@@ -351,8 +358,6 @@ let println = utf8_for_method "println"
 let event = utf8_for_class "topl.Checker$Event"
 let init = utf8_for_method "<init>"
 let property = utf8_for_class "topl.Property"
-let property_checker = utf8_for_field "checker"
-let checker = utf8_for_class "topl.Checker"
 let check = utf8_for_method "check"
 
 (* helpers for handling bytecode of methods *) (* {{{ *)
@@ -482,10 +487,9 @@ let bc_new_event id = List.concat
         event, init, ([`Int; `Array (`Class java_lang_Object)], `Void) )) ] ]
 
 let bc_call_checker =
-  [ BH.GETSTATIC (`Fieldref (property, property_checker, `Class checker))
-  ; BH.SWAP
-  ; BH.INVOKEVIRTUAL (`Methodref (`Class_or_interface
-      checker, check, ([`Class event], `Void) )) ]
+  [ BH.SWAP
+  ; BH.INVOKESTATIC (`Methodref (`Class_or_interface
+      property, check, ([`Class event], `Void) )) ]
 
 let bc_emit id values = match id with
   | None -> []

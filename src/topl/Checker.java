@@ -4,7 +4,6 @@ package topl;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayDeque;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.IdentityHashMap;
@@ -392,10 +391,31 @@ public class Checker {
     }
     // }}}
     // helper functions {{{
+    private static boolean isConstant(Object o) {
+        return o instanceof Integer || o instanceof String;
+    }
+
     private static boolean valueEquals(Object o1, Object o2) {
-        if (o1 instanceof Integer)
+        if (isConstant(o1)) {
             return o1.equals(o2);
+        }
         return o1 == o2;
+    }
+
+    private static int valuesHashCode(Object[] xs) {
+        if (xs == null) {
+            return 0;
+        }
+        int h = 1;
+        for (Object x : xs) {
+            h *= 31;
+            if (isConstant(x)) {
+                h += x.hashCode();
+            } else {
+                h += System.identityHashCode(x);  // handles null
+            }
+        }
+        return h;
     }
 
     // TODO(rgrig): Might want to produce a set with a faster {contains}
@@ -417,17 +437,17 @@ public class Checker {
     }
     // }}}
     // property AST {{{
+    // Event must *not* use the JDK at *all*; otherwise JVM initialization
+    // may crash.
     public static class Event {
         final int id;
         final Object[] values;
 
-        final int hash;
         StackTraceElement[] callStack;
 
         public Event(int id, Object[] values) {
             this.id = id;
             this.values = values;
-            this.hash = id + Arrays.hashCode(values);
             assert check();
         }
 
@@ -439,7 +459,7 @@ public class Checker {
 
         @Override
         public int hashCode() {
-            return hash;
+            return id + valuesHashCode(values);
         }
 
         @Override
@@ -845,10 +865,11 @@ public class Checker {
         OLDEST
     };
 
+    public boolean checkerEnabled = true;
+
     // These should be printed by [Toplc.pp_constants_table], to make
     // them easily accessible to users.
     public boolean captureCallStacks = false;
-    public boolean checkerEnabled = false;
     public int historyLength = 10;
     public int statesLimit = 10;
     public SelectionStrategy selectionStrategy = SelectionStrategy.NEWEST;

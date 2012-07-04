@@ -246,7 +246,11 @@ let pp_constants_table j i =
   fprintf j   "@\nchecker.historyLength = 10;";
   fprintf j   "@\nchecker.statesLimit = 10;";
   fprintf j   "@\nchecker.captureCallStacks = false;";
+  fprintf j   "@\nchecker.selectionStrategy = Checker.SelectionStrategy.RANDOM;";
   fprintf j   "@]@\n}";
+  fprintf j "@]@\n}";
+  fprintf j "@\n@[<2>public static void stop() {";
+  fprintf j   "@\nchecker = null;";
   fprintf j "@]@\n}";
   fprintf j "@]@\n}@]"
 
@@ -549,18 +553,21 @@ let get_tag x =
 let put_labels_on =
   List.map (fun x -> (BC.fresh_label (), x))
 
-let rec bc_at_return return_code = function
-  | [] -> []
-  | ((_, BH.ARETURN) as r) :: xs
-  | ((_, BH.DRETURN) as r) :: xs
-  | ((_, BH.FRETURN) as r) :: xs
-  | ((_, BH.IRETURN) as r) :: xs
-  | ((_, BH.LRETURN) as r) :: xs
-  | ((_, BH.RETURN) as r) :: xs ->
-      put_labels_on return_code
-        @ (r :: (bc_at_return return_code xs))
-  (* do not instrument RET or WIDERET *)
-  | x :: xs -> x :: (bc_at_return return_code xs)
+let rec bc_at_return =
+  let is_return = function
+    | BH.ARETURN | BH.DRETURN | BH.FRETURN
+    | BH.IRETURN | BH.LRETURN | BH.RETURN -> true
+    (* do not instrument RET or WIDERET *)
+    | _ -> false in
+  function
+    | [] -> U.id
+    | r :: rs ->
+        let rec f r rs = function
+          | [] -> []
+          | (xl, xi) :: xs when is_return xi ->
+              (xl, r) :: (put_labels_on (rs @ [xi])) @ (f r rs xs)
+          | x :: xs -> x :: f r rs xs in
+        f r rs
 
 let bc_at_call xs lys =
   put_labels_on xs @ lys

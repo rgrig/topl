@@ -392,7 +392,10 @@ public class Checker {
     // }}}
     // helper functions {{{
     private static boolean isConstant(Object o) {
-        return o instanceof Integer || o instanceof String;
+        return
+            o instanceof Integer
+            || o instanceof String
+            || o instanceof Boolean;
     }
 
     private static boolean valueEquals(Object o1, Object o2) {
@@ -524,7 +527,7 @@ public class Checker {
         // so it's ignored by {@code equals}.
         Parent parent;
 
-        // How many transitions were taken to build this state.
+        // How many non-skip transitions were taken to build this state.
         int time;
 
         private State(int vertex, Treap<Binding> store, Queue<Event> events,

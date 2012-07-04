@@ -235,19 +235,17 @@ let pp_constants_table j i =
   fprintf j "@\n@[<2>public static final Object[] constants =@ ";
   fprintf j   "new Object[]{%a@]};" (pp_v_list pp_string) constants;
   fprintf j "@\npublic static Checker checker = null;";
-  fprintf j "@\n@[<2>static {";
-  fprintf j   "@\nchecker.historyLength = 10;";
-  fprintf j   "@\nchecker.statesLimit = 10;";
-  fprintf j   "@\nchecker.captureCallStacks = false;";
-  fprintf j "@]@\n}";
-  fprintf j "@\n@[<2>static void check(Event event) {";
+  fprintf j "@\n@[<2>public static void check(Checker.Event event) {";
   fprintf j   "@\n@[<2>if (checker != null) {";
   fprintf j     "@\nchecker.check(event);";
   fprintf j   "@]@\n}";
   fprintf j "@]@\n}";
-  fprintf j "@\n@[<2>static void start() {";
+  fprintf j "@\n@[<2>public static void start() {";
   fprintf j   "@\n@[<2>if (checker == null) {";
-  fprintf j     "@[<2>checker =@ Checker.Parser.checker(%a,@ %a,@ constants);@]" pp_ext "text"  pp_ext "strings";
+  fprintf j     "@\n@[<2>checker =@ Checker.Parser.checker(%a,@ %a,@ constants);@]" pp_ext "text"  pp_ext "strings";
+  fprintf j   "@\nchecker.historyLength = 10;";
+  fprintf j   "@\nchecker.statesLimit = 10;";
+  fprintf j   "@\nchecker.captureCallStacks = false;";
   fprintf j   "@]@\n}";
   fprintf j "@]@\n}";
   fprintf j "@]@\n}@]"
@@ -487,8 +485,7 @@ let bc_new_event id = List.concat
         event, init, ([`Int; `Array (`Class java_lang_Object)], `Void) )) ] ]
 
 let bc_call_checker =
-  [ BH.SWAP
-  ; BH.INVOKESTATIC (`Methodref (`Class_or_interface
+  [ BH.INVOKESTATIC (`Methodref (`Class_or_interface
       property, check, ([`Class event], `Void) )) ]
 
 let bc_emit id values = match id with

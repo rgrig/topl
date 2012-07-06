@@ -246,7 +246,7 @@ let pp_constants_table j i =
   fprintf j   "@\nchecker.historyLength = 10;";
   fprintf j   "@\nchecker.statesLimit = 10;";
   fprintf j   "@\nchecker.captureCallStacks = false;";
-  fprintf j   "@\nchecker.selectionStrategy = Checker.SelectionStrategy.RANDOM;";
+  fprintf j   "@\nchecker.selectionStrategy = Checker.SelectionStrategy.OLDEST;";
   fprintf j   "@]@\n}";
   fprintf j "@]@\n}";
   fprintf j "@\n@[<2>public static void stop() {";

@@ -5,12 +5,10 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Scanner;
-import java.util.Set;
 // }}}
 public class Checker {
     /*  Implementation Notes {{{
@@ -99,10 +97,10 @@ public class Checker {
         public boolean equals(Object other) {
             Queue otherQueue = (Queue) other; // yes, exception wanted
             return
-                (a == null && otherQueue.a == null)
-                || (a.equals(otherQueue.a) &&
-                        ((b == null && otherQueue.b == null)
-                        || b.equals(otherQueue.b)));
+                ((a == null) == (otherQueue.a == null))
+                && (a == null || a.equals(otherQueue.a))
+                && ((b == null) == (otherQueue.b == null))
+                && (b == null || b.equals(otherQueue.b));
         }
         private class Itr implements Iterator<T> {
             int state;
@@ -390,6 +388,122 @@ public class Checker {
         }
     }
     // }}}
+    // HSet<T> {{{
+    static class HSet<T> implements Iterable<T> {
+        Object[] data;
+        int size;
+        int bits;
+
+        private HSet() {
+            // nothing
+        }
+
+        public static <T> HSet<T> make(int newSize) {
+            HSet<T> result = new HSet<T>();
+            result.bits = hashBits(newSize);
+            result.data = new Object[1 << result.bits];
+            return result;
+        }
+
+        public void add(T x) {
+            maybeGrow(size + 1);
+            internalAdd(x);
+        }
+
+        public void add(T[] xs, int from, int to) {
+            maybeGrow(size + to - from);
+            for (int i = from; i < to; ++i) {
+                internalAdd(xs[i]);
+            }
+        }
+
+        public boolean contains(T x) {
+            return data[search(x)] != null;
+        }
+
+        public int size() {
+            return size;
+        }
+
+        public void clear() {
+            size = 0;
+            data = new Object[data.length];
+        }
+
+        @Override
+        public Iterator<T> iterator() {
+            return new Itr();
+        }
+
+        // Compute how many bits to use for hash values such that
+        // the load factor is limited.
+        static int hashBits(int size) {
+            int result;
+            for (result = 0; 4 * size > 3 * (1 << result); ++result);
+            return result;
+        }
+
+        void maybeGrow(int newSize) {
+            if (4 * newSize <= 3 * data.length) {
+                return;
+            }
+            bits = hashBits(newSize);
+            Object[] oldData = data;
+            data = new Object[1 << bits];
+            size = 0;
+            for (Object x : oldData) {
+                if (x != null) {
+                    internalAdd(x);
+                }
+            }
+        }
+
+        int search(Object x) {
+            assert x != null;
+            int h = ((x.hashCode() * 1327217909) >> (32 - bits)) & (data.length - 1);
+            while (data[h] != null && !data[h].equals(x)) {
+                h = (h + 1) & (data.length - 1);
+            }
+            return h;
+        }
+
+        void internalAdd(Object x) {
+            int h = search(x);
+            if (data[h] == null) {
+                ++size;
+                data[h] = x;
+            }
+        }
+
+        class Itr implements Iterator<T> {
+            int index;
+            int togo;
+
+            Itr() {
+                index = -1;
+                togo = size;
+            }
+
+            @Override
+            public boolean hasNext() {
+                return togo > 0;
+            }
+
+            @SuppressWarnings("unchecked")
+            @Override
+            public T next() {
+                while (data[++index] == null);
+                --togo;
+                return (T) data[index];
+            }
+
+            @Override
+            public void remove() {
+                throw new UnsupportedOperationException();
+            }
+        }
+    }
+    // }}}
     // helper functions {{{
     private static boolean isConstant(Object o) {
         return
@@ -405,25 +519,28 @@ public class Checker {
         return o1 == o2;
     }
 
+    private static int valueHashCode(Object x) {
+        if (isConstant(x)){
+            return x.hashCode();
+        } else {
+            return System.identityHashCode(x); // handles null
+        }
+    }
+
     private static int valuesHashCode(Object[] xs) {
         if (xs == null) {
             return 0;
         }
-        int h = 1;
+        int h = 0;
         for (Object x : xs) {
-            h *= 31;
-            if (isConstant(x)) {
-                h += x.hashCode();
-            } else {
-                h += System.identityHashCode(x);  // handles null
-            }
+            h = 31 * h + valueHashCode(x) + 1;
         }
         return h;
     }
 
     // TODO(rgrig): Might want to produce a set with a faster {contains}
-    static Set<Integer> setOf(int[] xs) {
-        HashSet<Integer> r = new HashSet<Integer>();
+    static HSet<Integer> setOf(int[] xs) {
+        HSet<Integer> r = HSet.make(xs.length);
         for (int x : xs) {
             r.add(x);
         }
@@ -480,6 +597,7 @@ public class Checker {
         }
     }
 
+    // Note: x.equals(y) ==> (x.compareTo(y) == 0), but not vice-versa.
     static class Binding implements Comparable<Binding> {
         final int variable;
         final Object value;
@@ -498,6 +616,18 @@ public class Checker {
         public int compareTo(Binding other) {
             // Overflow safe, because variable is nonnegative.
             return variable - other.variable;
+        }
+
+        @Override
+        public int hashCode() {
+            return variable + valueHashCode(value);
+        }
+
+        @Override
+        public boolean equals(Object other) {
+            Binding otherBinding = (Binding) other;
+            return variable == otherBinding.variable
+                && valueEquals(value, otherBinding.value);
         }
 
         @Override
@@ -729,7 +859,7 @@ public class Checker {
     }
 
     static class TransitionStep {
-        final Set<Integer> eventIds;
+        final HSet<Integer> eventIds;
         final Guard guard;
         final Action action;
 
@@ -883,11 +1013,11 @@ public class Checker {
     private int operations = 0; // estimate of work done since the last GC
 
     final private Automaton automaton;
-    private HashSet<State> states;
+    private HSet<State> states;
 
     public Checker(Automaton automaton) {
         this.automaton = automaton;
-        this.states = new HashSet<State>();
+        this.states = HSet.make(automaton.startVertices.length);
         for (int v : automaton.startVertices) {
             states.add(State.start(v));
         }
@@ -1051,7 +1181,7 @@ public class Checker {
             System.out.printf(" }\n");
             System.out.printf("event %d: %s\n", event.id, automaton.eventNames[event.id]);
         }
-        HashSet<State> newActiveStates = new HashSet<State>(2 * states.size());
+        HSet<State> newActiveStates = HSet.make(states.size());
         for (State state : states) {
             if (automaton.transitions[state.vertex].length == 0) {
                 continue;
@@ -1141,9 +1271,7 @@ public class Checker {
                 default:
                     assert false;
             }
-            for (i = from; i < from + statesLimit; ++i) {
-                states.add(all[i]);
-            }
+            states.add(all, from, from + statesLimit);
             assert states.size() == statesLimit;
         }
 
@@ -1307,7 +1435,7 @@ public class Checker {
     }
     // }}}
     // debug {{{
-    private String eventIdsToString(Set<Integer> eventIds) {
+    private String eventIdsToString(HSet<Integer> eventIds) {
         StringBuilder sb = new StringBuilder();
         sb.append('[');
         boolean later = false;

@@ -1,0 +1,10 @@
+property IterateTaint
+  // NOTE: several other permutations of these actions are also illegal
+  observe <{Itr.next,Concat.make,Str.itr}>
+  prefix <{Itr,Concat,Str}>
+  start -> start: *
+  start -> a:  I := S.itr()
+  a -> a: *, S := make(s, *), S := make(*, s)
+  a -> b: J := s.itr()
+  b -> c: i.set(*)
+  c -> error: j.next()

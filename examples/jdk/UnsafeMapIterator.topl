@@ -1,0 +1,9 @@
+property UnsafeMapIterator
+  message "Map updated while iterating its keys or values."
+  observe <java.util.{Iterator,Collection}.*>
+  prefix <java.util>
+  start -> start: *
+  start -> gotView: V := M.<Map.keySet>(), V := M.<Map.values>()
+  gotView -> iterating: I := v.iterator()
+  iterating -> updated: m.<Map.put>[*], m.<Map.putAll>[*], m.<Map.clear>[*], m.<Map.remove>[*]
+  updated -> error: i.next()

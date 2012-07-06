@@ -1,0 +1,7 @@
+property UnsafeFileWriter
+  message "Writing to file after it was closed."
+  observe <java.io.FileWriter.*>
+  prefix <java.io.FileWriter>
+  start -> start: *
+  start -> closed: F.close()
+  closed -> error: f.write[*], f.append[*]

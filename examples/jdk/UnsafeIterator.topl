@@ -1,0 +1,8 @@
+property UnsafeIterator
+  message "Collection modified while iterating."
+  observe <java.util.{Collection,Iterator}.*>
+  prefix <java.util.{Collection,Iterator}>
+  start -> start: *
+  start -> iterating: I := C.iterator()
+  iterating -> modified: c.remove[*], c.add[*]
+  modified -> error: i.next()

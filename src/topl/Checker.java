@@ -1047,6 +1047,8 @@ public class Checker {
                 System.err.printf("\"%s\"", (String) v);
             } else if (v instanceof Integer) {
                 System.err.printf("%d", (Integer) v);
+            } else if (v instanceof Boolean) {
+                System.err.printf("%b", (Boolean) v);
             } else {
                 System.err.printf("obj[%d]", getIdForPrinting(v));
             }

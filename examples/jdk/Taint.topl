@@ -1,0 +1,23 @@
+property Taint
+  message "Dirty string went to SQL server."
+  observe <javax.servlet.http.HttpServletRequest.getParameter>
+  observe <java.io.{FileReader.read,File.*}>
+  observe <java.sql.{Prepared,}Statement.executeQuery>
+  observe <java.lang.{System.getenv,String.concat,Runtime.exec}>
+  observe <javax.servlet.jsp.JspWriter>
+  prefix <javax.servlet.http>
+  prefix <java.io>
+  prefix <java.sql>
+  prefix <java.lang>
+  prefix <javax.servlet.jsp>
+  start -> start: *
+  start -> tracking: D := *.<HttpServletRequest.getParameter>[*]
+  start -> tracking: D := *.<FileReader.read>[*]
+  start -> tracking: D := *.<PreparedStatement.executeQuery>[*]
+  start -> tracking: D := *.<System.getenv>[*]
+  tracking -> tracking: *
+  tracking -> tracking: D := d.<String.concat>(*), D := *.<String.concat>(d)
+  tracking -> error: *.<Statement.executeQuery>(d)
+  tracking -> error: *.<JspWriter.print>(d)
+  tracking -> error: *.<File.\<init\>>(d), *.<File.\<init\>>(d,*), *.<File.\<init\>>(*,d)
+  tracking -> error: *.<Runtime.exec>(d), *.<Runtime.exec>(d,*), *.<Runtime.exec>(d,*,*)

@@ -661,12 +661,12 @@ public class Checker {
         int time;
 
         private State(int vertex, Treap<Binding> store, Queue<Event> events,
-                Parent parent) {
+                Parent parent, int time) {
             this.vertex = vertex;
             this.store = store;
             this.events = events;
             this.parent = parent;
-            this.time = 1 + (parent == null? 0 : parent.state.time);
+            this.time = time;
         }
 
         @Override
@@ -684,21 +684,21 @@ public class Checker {
 
         static State start(int vertex) {
             return new State(vertex, Treap.<Binding>empty(),
-                    Queue.<Event>empty(), null);
+                    Queue.<Event>empty(), null, 0);
         }
 
         static State make(int vertex, Treap<Binding> store, Queue<Event> events,
                 Queue<Event> consumed, State parent) {
             return new State(vertex, store, events,
-                    new Parent(parent, consumed));
+                    new Parent(parent, consumed), parent.time + 1);
         }
 
         State pushEvent(Event event) {
-            return new State(vertex, store, events.push(event), parent);
+            return new State(vertex, store, events.push(event), parent, time);
         }
 
         State popEvent() {
-            return new State(vertex, store, events.pop(), parent);
+            return new State(vertex, store, events.pop(), parent, time);
         }
 
         public String toString () {
@@ -1141,12 +1141,11 @@ public class Checker {
                 swap(a, jj++, kk);
             }
         }
-        if (jj < k) {
-            if (j < jj) {
-                selectOldest(a, i, j, jj);
-            } else {
-                selectOldest(a, jj, j, k);
-            }
+        swap(a, i, --jj);
+        if (j < jj) {
+            selectOldest(a, i, j, jj);
+        } else if (j > jj) {
+            selectOldest(a, jj + 1, j, k);
         }
     }
 
@@ -1174,10 +1173,11 @@ public class Checker {
             boolean first = true;
             System.out.printf("States");
             for (State s : states) {
-                System.out.printf("\n  %s ( vertex = %s(%d); len(events) = %d; len(bindings) = %d )",
+                System.out.printf("\n  %s ( vertex = %s(%d); len(events) = %d; len(bindings) = %d; time = %d )",
                         first ? "{" : ",",
                         automaton.vertexNames[s.vertex], s.vertex,
-                        s.events.size(), s.store.size());
+                        s.events.size(), s.store.size(),
+                        s.time);
                 first = false;
             }
             System.out.printf(" }\n");

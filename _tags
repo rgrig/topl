@@ -1,10 +1,11 @@
 <src>: include
-true: package(barista)
+<src/toplc.ml>: package(barista)
 true: package(menhirLib)
 true: package(str)
 true: package(unix)
-true: use_barista
+<src/toplc.ml>: use_barista
 true: use_menhir
+true and not <src/toplc.ml>: for-pack(Topl)
 <src/*.mly>: explain
 true: annot
 true: debug

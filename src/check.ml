@@ -34,7 +34,7 @@ let adjacency_of_edges source target es =
     U.StringMap.add s (t :: old) acc in
   default_find [] (List.fold_left f U.StringMap.empty es)
 
-let rec reachable_from g s =
+let reachable_from g s =
   let r = ref U.StringSet.empty in
   let rec f s =
     if not (U.StringSet.mem s !r) then begin

@@ -17,6 +17,9 @@ native:
 	@$(OCAMLBUILD) $(NATIVES)
 	ln -sf toplc.native toplc
 
+lib:
+	@$(OCAMLBUILD) topl.cma topl.cmxa
+
 test: default
 	@cd tests; ./test -c
 

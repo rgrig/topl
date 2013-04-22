@@ -106,7 +106,7 @@ let rec fix f x =
 
 let rec y f x = f (y f) x
 
-let rec memo f f' =
+let memo f f' =
   let cache = Hashtbl.create 101 in
   fun x ->
     try
@@ -217,7 +217,7 @@ let command_escape s =
   "\"" ^ s ^ "\""
 
 (* It is *unlikely* that the returned name is of an existing file. *)
-let rec temp_path prefix =
+let temp_path prefix =
   Filename.concat
     (Filename.temp_dir_name)
     (Printf.sprintf "%s%Lx"

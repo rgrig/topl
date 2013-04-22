@@ -553,7 +553,7 @@ let get_tag x =
 let put_labels_on =
   List.map (fun x -> (BC.fresh_label (), x))
 
-let rec bc_at_return =
+let bc_at_return =
   let is_return = function
     | BH.ARETURN | BH.DRETURN | BH.FRETURN
     | BH.IRETURN | BH.LRETURN | BH.RETURN -> true
@@ -587,7 +587,7 @@ let instrument_code is_init call_id return_id arguments return locals code =
     ; bc_emit return_id (if_ (return <> `Void) [[(locals, return)]]) ]) in
   instrument_call (instrument_return code)
 
-let rec get_ancestors h c =
+let get_ancestors h c =
   let cs = Hashtbl.create 0 in
   let rec ga c =
     if not (Hashtbl.mem cs c) then begin

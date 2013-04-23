@@ -64,16 +64,17 @@ rule tok1 = parse
 
 {
   (* EXERCISE: Write it with continuations. *)
-  let token lexbuf =
+  let token =
     let indents = ref [0] in
     let scheduled_rb = ref 0 in
-    let return t = (t, lexbuf.Lexing.lex_start_p, lexbuf.Lexing.lex_curr_p) in
-    let rec return_rb n = match !indents with
-      | h :: t when h > n -> incr scheduled_rb; indents := t; return_rb n
+(*    let return t = (t, lexbuf.Lexing.lex_start_p, lexbuf.Lexing.lex_curr_p) in *)
+    let return t = t in 
+    let rec return_rb lexbuf n = match !indents with
+      | h :: t when h > n -> incr scheduled_rb; indents := t; return_rb lexbuf n
       | h :: _ when h < n -> raise Error
       | [] -> failwith "broken invariant: List.length !indents > 0"
-      | _ -> tok2 ()
-    and tok2 () =
+      | _ -> tok2 lexbuf
+    and tok2 lexbuf =
       if !scheduled_rb > 0 then begin
         decr scheduled_rb;
         return RC
@@ -82,7 +83,7 @@ rule tok1 = parse
             if n > List.hd !indents then begin
               indents := n :: !indents;
               return LC
-            end else return_rb n
+            end else return_rb lexbuf n
         | Left t -> return t in
     tok2
 }

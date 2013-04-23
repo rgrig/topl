@@ -1,11 +1,11 @@
 <src>: include
-<src/toplc.ml>: package(barista)
+<src/toplc.ml> or <src/classMapper.*>: package(barista)
 true: package(menhirLib)
 true: package(str)
 true: package(unix)
-<src/toplc.ml>: use_barista
+<topl.byte> or <topl.native>: use_barista
 true: use_menhir
-true and not <src/toplc.ml>: for-pack(Topl)
+true: for-pack(Topl)
 <src/*.mly>: explain
 true: annot
 true: debug

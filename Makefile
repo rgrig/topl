@@ -20,6 +20,13 @@ native:
 lib:
 	@$(OCAMLBUILD) topl.cma topl.cmxa
 
+install-lib: lib
+	@cp src/META META
+	@echo "version=\"$$(date +%Y%m)\"" >> META
+	@ocamlfind remove topl
+	@ocamlfind install topl META $(addprefix _build/topl.,cmi cma cmxa a)
+	@rm -f META
+
 test: default
 	@cd tests; ./test -c
 
@@ -31,5 +38,6 @@ clean:
 	@$(OCAMLBUILD) -clean
 	@rm -rf classes
 	@rm -f toplc
+	@rm -f META
 
-.PHONY: byte checker clean default native test
+.PHONY: byte checker clean default install-lib lib native test

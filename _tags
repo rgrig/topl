@@ -5,7 +5,7 @@ true: package(str)
 true: package(unix)
 <topl.byte> or <topl.native>: use_barista
 true: use_menhir
-true: for-pack(Topl)
+<src/*.ml>: for-pack(Topl)
 <src/*.mly>: explain
 true: annot
 true: debug

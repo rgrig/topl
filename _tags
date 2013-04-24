@@ -1,12 +1,13 @@
 <src>: include
-<src/toplc.ml> or <src/classMapper.*>: package(barista)
-true: package(menhirLib)
+<src/toplc.*> or <src/classMapper.*>: package(barista)
 true: package(str)
 true: package(unix)
-<topl.byte> or <topl.native>: use_barista
 true: use_menhir
 <src/*.ml>: for-pack(Topl)
 <src/*.mly>: explain
 true: annot
 true: debug
 #true: profile
+
+# workaround for http://caml.inria.fr/mantis/view.php?id=5039
+<*.cmxa>: -linkpkg

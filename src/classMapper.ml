@@ -12,7 +12,7 @@ let (/) d f =
     else F.concat d f
 
 let is_jar f = List.exists (F.check_suffix f) [".jar"; ".zip"]
-let is_class f = F.check_suffix f ".class"
+let is_class f = F.check_suffix f ".class" && f <> "package-info.class"
 
 let ensure_dir f =
   if F.check_suffix f "/" then f else (f ^ "/")

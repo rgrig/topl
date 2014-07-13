@@ -93,9 +93,10 @@ public class Checker {
             }
             return hash;
         }
+        @SuppressWarnings("unchecked")
         @Override
         public boolean equals(Object other) {
-            Queue otherQueue = (Queue) other; // yes, exception wanted
+            Queue<T> otherQueue = (Queue<T>) other; // yes, exception wanted
             return
                 ((a == null) == (otherQueue.a == null))
                 && (a == null || a.equals(otherQueue.a))
@@ -363,9 +364,10 @@ public class Checker {
             return hash;
         }
 
+        @SuppressWarnings("unchecked")
         @Override
         public boolean equals(Object other) {
-            Treap otherTreap = (Treap) other; // yes, cast exception wanted
+            Treap<T> otherTreap = (Treap<T>) other; // yes, cast exception wanted
             return this == other ||
                 (hash == otherTreap.hash &&
                 equalIterators(iterator(), otherTreap.iterator()));
@@ -547,7 +549,7 @@ public class Checker {
         return r;
     }
 
-    static <T> boolean equalIterators(Iterator<T> i, Iterator j) {
+    static <T> boolean equalIterators(Iterator<T> i, Iterator<T> j) {
         while (i.hasNext() && j.hasNext()) {
             if (!i.next().equals(j.next())) { // yes, NullExc wanted
                 return false;
@@ -1004,6 +1006,7 @@ public class Checker {
     // them easily accessible to users.
     public boolean captureCallStacks = false;
     public int historyLength = 10;
+    public boolean onlyLog = false;
     public int statesLimit = 10;
     public SelectionStrategy selectionStrategy = SelectionStrategy.NEWEST;
 
@@ -1149,16 +1152,29 @@ public class Checker {
         }
     }
 
+    private void logEvent(Event event) {
+        System.err.printf("TOPL LOG %d", event.id);
+        for (Object o : event.values) {
+            System.err.printf(" %d", System.identityHashCode(o));
+        }
+        System.err.println();
+    }
+
     public synchronized void check(Event event) {
         try {
             if (!checkerEnabled) {
                 return;
             }
             checkerEnabled = false;
-            if (captureCallStacks) {
-                event.callStack = throwable.fillInStackTrace().getStackTrace();
+            if (onlyLog) {
+                logEvent(event);
+            } else {
+                if (captureCallStacks) {
+                    throwable.fillInStackTrace();
+                    event.callStack = throwable.getStackTrace();
+                }
+                internalCheck(event);
             }
-            internalCheck(event);
             checkerEnabled = true;
         } catch (Throwable t) {
             System.err.println("TOPL: INTERNAL ERROR");
@@ -1486,7 +1502,7 @@ public class Checker {
                     s.append(cap <= 0 || step.eventIds.size() <= cap ? eventIdsToString(step.eventIds) : "[" + step.eventIds.size() + " ids (>" + cap + ")]");
                     s.append(step.guard.toString());
                     s.append("<");
-                    for(Map.Entry a : step.action.assignments.entrySet()) {
+                    for(Map.Entry<Integer, Integer> a : step.action.assignments.entrySet()) {
                         s.append(a.getKey());
                         s.append(" <- ");
                         s.append(a.getValue());

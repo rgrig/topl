@@ -1153,10 +1153,12 @@ public class Checker {
     }
 
     private void logEvent(Event event) {
-        System.err.printf("TOPL LOG %d", event.id);
-        for (Object o : event.values) {
-            System.err.printf(" %d", System.identityHashCode(o));
+        assert onlyLog;
+        if (printingIds == null) {
+            printingIds = new IdentityHashMap<Object, Integer>();
         }
+        System.err.printf("TOPL LOG %s", automaton.eventNames[event.id]);
+        printValues(event.values);
         System.err.println();
     }
 

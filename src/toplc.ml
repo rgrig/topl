@@ -246,11 +246,15 @@ let pp_constants_table j i =
   fprintf j   "@\nchecker.historyLength = 10;";
   fprintf j   "@\nchecker.statesLimit = 10;";
   fprintf j   "@\nchecker.captureCallStacks = false;";
-  fprintf j   "@\nchecker.onlyLog = false;";
+  fprintf j   "@\nchecker.onlyLogEvents = false;";
+  fprintf j   "@\nchecker.automatonLog = null; // type is PrintWriter";
   fprintf j   "@\nchecker.selectionStrategy = Checker.SelectionStrategy.NEWEST;";
   fprintf j   "@]@\n}";
   fprintf j "@]@\n}";
   fprintf j "@\n@[<2>public static void stop() {";
+  fprintf j   "@\n@[<2>if (checker.automatonLog != null) {";
+  fprintf j     "@\nchecker.automatonLog.flush();";
+  fprintf j   "@]@\n}";
   fprintf j   "@\nchecker = null;";
   fprintf j "@]@\n}";
   fprintf j "@]@\n}@]"

@@ -652,7 +652,8 @@ public class Checker {
             }
         }
 
-        static long idPool = -1;
+        static final long ROOT_ID = 0l;
+        static long idPool = ROOT_ID;
         final long id;
         public long id() { return id; }
 
@@ -669,13 +670,13 @@ public class Checker {
         int time;
 
         private State(int vertex, Treap<Binding> store, Queue<Event> events,
-                Parent parent, int time) {
-            this.id = ++idPool;
+                Parent parent, int time, long id) {
             this.vertex = vertex;
             this.store = store;
             this.events = events;
             this.parent = parent;
             this.time = time;
+            this.id = id;
         }
 
         @Override
@@ -693,21 +694,22 @@ public class Checker {
 
         static State start(int vertex) {
             return new State(vertex, Treap.<Binding>empty(),
-                    Queue.<Event>empty(), null, 0);
+                    Queue.<Event>empty(), null, 0, ROOT_ID);
         }
 
         static State make(int vertex, Treap<Binding> store, Queue<Event> events,
                 Queue<Event> consumed, State parent) {
             return new State(vertex, store, events,
-                    new Parent(parent, consumed), parent.time + 1);
+                    new Parent(parent, consumed), parent.time + 1, ++idPool);
         }
 
         State pushEvent(Event event) {
-            return new State(vertex, store, events.push(event), parent, time);
+            return new State(
+                    vertex, store, events.push(event), parent, time, id);
         }
 
         State popEvent() {
-            return new State(vertex, store, events.pop(), parent, time);
+            return new State(vertex, store, events.pop(), parent, time, id);
         }
 
         public String toString () {

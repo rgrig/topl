@@ -75,4 +75,14 @@ class Concat implements Str {
     }
   }
 }
-
+public class Taint {
+  public static void main(String[] args) {
+    Str a = new CharArray(10);
+    Itr ia = a.itr();
+    Str b = Concat.make(a, a);
+    Itr ib = b.itr();
+    ia.next();
+    ia.set('a');
+    ib.next();
+  }
+}

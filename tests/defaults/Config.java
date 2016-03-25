@@ -1,7 +1,8 @@
-import static topl.Property.checker;
+import topl.Property;
 public class Config {
   public static void main(String[] args) {
-    checker.captureCallStacks = false;
+    Property.start();
     Main.main(args);
+    Property.stop();
   }
 }

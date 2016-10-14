@@ -1,10 +1,12 @@
-FROM ubuntu:15.10
+FROM ubuntu:16.04
 RUN mkdir /topl-related
 WORKDIR /topl-related
 RUN apt-get -y update && apt-get -y install \
   autoconf \
   camlzip \
   cppo \
+  default-jdk \
+  emacs24-nox \
   git \
   libcamomile-ocaml-dev \
   make \
@@ -12,7 +14,7 @@ RUN apt-get -y update && apt-get -y install \
   ocaml-findlib \
   ocaml-native-compilers \
   ocaml-nox \
-  openjdk-7-jre
+  vim
 RUN git clone https://github.com/rgrig/barista.git
 RUN git clone https://github.com/rgrig/topl.git
 WORKDIR /topl-related/barista
@@ -22,4 +24,4 @@ RUN make install
 WORKDIR /topl-related/topl
 RUN make
 ENV PATH /topl-related/topl:$PATH
-CMD toplc -help; echo also, try ls examples
+CMD /bin/bash

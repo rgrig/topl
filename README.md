@@ -2,7 +2,13 @@ Tools for [Temporal Object-oriented Property Language](http://rgrig.github.com/t
 
 To try it, use
 
-    docker run rgrig/topl
+    docker run -ti rgrig/topl
+
+Then try
+
+    make test
+    ls examples
+    ./toplc -help
 
 To setup a development environment, do what
   [Dockerfile](https://github.com/rgrig/topl/blob/master/Dockerfile) says.

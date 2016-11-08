@@ -219,7 +219,7 @@ let command_escape s =
 (* It is *unlikely* that the returned name is of an existing file. *)
 let temp_path prefix =
   Filename.concat
-    (Filename.temp_dir_name)
+    (Filename.get_temp_dir_name ())
     (Printf.sprintf "%s%Lx"
       prefix
       (Int64.of_float (1000.0 *. Unix.gettimeofday ())))

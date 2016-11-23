@@ -160,6 +160,11 @@ let fs_filter p f =
   let r = ref [] in
   fs_postorder (fun x -> if p x then r := x::!r) f; !r
 
+let open_formatter n =
+  let c = open_out n in
+  let f = formatter_of_out_channel c in
+  (c, f)
+
 let rm_r dir =
   let delete f =
     if Sys.is_directory f then Unix.rmdir f
@@ -215,6 +220,11 @@ let mk_tmp_dir p s =
 (* TODO(rgrig): Do this properly. *)
 let command_escape s =
   "\"" ^ s ^ "\""
+
+let compile sourcepath f =
+  let u = command_escape in
+  let c = Printf.sprintf "javac -sourcepath %s %s" (u sourcepath) (u f) in
+  ignore (Sys.command c)
 
 (* It is *unlikely* that the returned name is of an existing file. *)
 let temp_path prefix =

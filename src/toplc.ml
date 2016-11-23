@@ -266,15 +266,12 @@ let pp_strings_nonl f index =
     Printf.fprintf f "%s\n" s
   done
 
-let generate_checkers out_dir p =
+let generate_checkers_for_runtime out_dir p =
   check_automaton p;
   let (/) = Filename.concat in
   U.cp_r (Config.topl_dir/"src"/"topl") out_dir;
   let topl_dir = out_dir/"topl" in
-  let o n =
-    let c = open_out (topl_dir/("Property." ^ n)) in
-    let f = formatter_of_out_channel c in
-    (c, f) in
+  let o ext = U.open_formatter (topl_dir/("Property."^ext)) in
   let (jc, j), (tc, t) = o "java", o "text" in
   let sc = open_out (topl_dir/"Property.strings") in
   let index = mk_pp_index p in
@@ -282,11 +279,7 @@ let generate_checkers out_dir p =
   pp_strings_nonl sc index;
   fprintf t "@[%a@." (pp_automaton index) p;
   List.iter close_out_noerr [jc; tc; sc];
-  ignore (Sys.command
-    (Printf.sprintf
-      "javac -sourcepath %s %s"
-      (U.command_escape out_dir)
-      (U.command_escape (topl_dir/"Property.java"))))
+  U.compile out_dir (topl_dir/"Property.java")
 
 (* }}} *)
 (* conversion to Java representation *) (* {{{ *)
@@ -639,7 +632,7 @@ let pp_class f c =
   let n = B.Name.internal_utf8_for_class c.BH.c_name in
   fprintf f "@[%s@]" (B.Utils.UTF8.to_string n)
 
-let instrument_class get_tag h c =
+let instrument_class_for_runtime get_tag h c =
   if log_cp then printf "@\n@[<2>begin instrument %a" pp_class c;
   let instrumented_methods =
     List.map (instrument_method get_tag h c.BH.c_name) c.BH.c_methods in
@@ -671,6 +664,27 @@ let check_work_directory d =
     if U.is_prefix dir here then raise e
   with Not_found -> raise e
 
+let instrument_class_infer _ _ x =
+  x (* TODO *)
+
+let generate_checkers_for_infer out_dir p =
+  check_automaton p;
+  let (/) = Filename.concat in
+  let topl_dir = out_dir/"topl" in
+  let jf = topl_dir/"Property.java" in
+  U.mkdir_p topl_dir;
+  let jc, j = U.open_formatter jf in
+  fprintf j "@[hi there@.@]";
+  close_out_noerr jc;
+  U.compile out_dir jf
+
+
+let instrument_class = ref instrument_class_for_runtime
+let generate_checkers = ref generate_checkers_for_runtime
+let use_infer () =
+  instrument_class := instrument_class_infer;
+  generate_checkers := generate_checkers_for_infer
+
 let () =
   printf "@[";
   let usage = Printf.sprintf
@@ -683,7 +697,8 @@ let () =
       | Some _ -> raise (Arg.Bad "Repeated argument.")
       | None -> r := Some v in
     Arg.parse
-      [ "-i", Arg.String (set_dir in_dir), "input directory"
+      [ "-s", Arg.Unit use_infer, "generate infer checkers"
+      ; "-i", Arg.String (set_dir in_dir), "input directory"
       ; "-o", Arg.String (set_dir out_dir), "output directory" ]
       (fun x -> fs := x :: !fs)
       usage;
@@ -698,8 +713,8 @@ let () =
     let ps = read_properties !fs in
     let h = compute_inheritance in_dir in
     let p = transform_properties ps in
-    ClassMapper.map in_dir tmp_dir (instrument_class (get_tag p) h);
-    generate_checkers tmp_dir p;
+    ClassMapper.map in_dir tmp_dir (!instrument_class (get_tag p) h);
+    !generate_checkers tmp_dir p;
     U.rm_r out_dir;
     U.rename tmp_dir out_dir;
     printf "@."

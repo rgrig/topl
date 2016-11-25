@@ -74,6 +74,42 @@ type automaton =
     instrumented. *)
   ; event_names : (int, string) Hashtbl.t }
 
+(* following function produces an automaton with epsilon transitions *)
+    
+let to_simple_automaton automaton x =
+  let d =
+    let lfolder i x = max i (List.length x.steps) in
+    let afolder j y = max j (List.fold_left lfolder 0 y.outgoing_transitions) in
+    Array.fold_left afolder 0 x.vertices in
+  if d==0 then failwith "TODO : Automaton with d=0";
+  let max = d * d * (Array.length x.vertices) in
+  let to_name (id, h, k) = id*d*d + h*d + k in
+  let add_vertex_data vacc vd =
+    let old_trs = vd.outgoing_transitions in
+    let eval_tr tr h k = failwith "TODO" in
+    let get_trs trs h k tacc =
+      let skip_trs =
+        failwith "TODO"        
+      in
+      List.fold_left (fun acc tr -> (eval_tr tr h k) :: tacc) skip_trs trs
+    in
+    let rec loop i j acc =
+      if j == d then loop (i+1) 0 acc else
+        if i == d then acc else
+          loop i (j+1) (get_trs old_trs i j acc)
+    in
+    { vertex_property = vd.vertex_property;
+      vertex_name = vd.vertex_name;
+      outgoing_transitions = (loop 0 0 [])} :: vacc
+  in 
+  let new_vertices = Array.of_list (Array.fold_left add_vertex_data [] x.vertices)
+  in
+  { vertices = new_vertices;
+    observables = x.observables;
+    pattern_tags = x.pattern_tags;
+    event_names = x.event_names }
+  
+    
 let check_automaton x =
   let rec is_decreasing x = function
     | [] -> true

@@ -35,10 +35,21 @@ let map_option f xs =
 
 let cons x xs = x :: xs
 
+let pairs xs ys =
+  let one_pair x y = (x, y) in
+  let f x = List.map (one_pair x) ys in
+  List.concat (List.map f xs)
+
 let unique l =
   let h = Hashtbl.create 0 in
   List.iter (fun x -> Hashtbl.replace h x x) l;
   Hashtbl.fold (fun _ -> cons) h []
+
+let range n =
+  let rec loop acc = function
+    | 0 -> acc
+    | n -> loop (n - 1 :: acc) (n - 1) in
+  loop [] n
 
 let fold_with_index f init xs =
   let g (i, acc) x = succ i, f acc i x in

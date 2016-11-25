@@ -31,7 +31,7 @@ type method_ =  (* TODO: Use [PropAst.event_tag] instead? *)
     - emit the Java representation of the automaton
   A pattern like "c.m()" in the property matches method m in all classes that
   extend c (including c itself). For efficiency, the Java automaton does not
-  know anything about inheritance. While the bytecode is instrumented all the
+  know anything about inheritance. While the bytecode is instrumented, all the
   methods m in classes extending c get unique identifiers and the pattern
   "c.m()" is mapped to the set of those identifiers.
 
@@ -541,7 +541,8 @@ let get_tag x =
             incr cnt;
             let at p =
               let ts = Hashtbl.find x.pattern_tags p in
-              (* printf "added tag %d\n" !cnt; *)
+              if log_mm then
+                printf "added tag %d\n" !cnt;
               Hashtbl.replace x.pattern_tags p (!cnt :: ts);
               Hashtbl.replace x.event_names !cnt en in
             List.iter at ps;
@@ -650,6 +651,154 @@ let compute_inheritance in_dir =
   h
 
 (* }}} *)
+(* generate static monitor *) (* {{{ *)
+
+let instrument_class_for_infer =
+  instrument_class_for_runtime (* TODO XXX *)
+
+let max_arity p =
+  let arity_of_tag_guard { PA.method_arity; _ } = fst method_arity in
+  let f tg n = max (arity_of_tag_guard tg) n in
+  U.hashtbl_fold_keys f p.pattern_tags 0
+
+let guards_of_tag_cache = Hashtbl.create 1
+let guards_of_tag p =
+  try Hashtbl.find guards_of_tag_cache p
+  with Not_found ->
+    let h = Hashtbl.create 1 in
+    let one_tag g t =
+      let gs = try Hashtbl.find h t with Not_found -> [] in
+      Hashtbl.replace h t (g :: gs) in
+    let one_guard g ts = List.iter (one_tag g) ts in
+    Hashtbl.iter one_guard p.pattern_tags;
+    Hashtbl.add guards_of_tag_cache p h;
+    h
+
+let get_guards_of_tag p tag =
+  Hashtbl.find (guards_of_tag p) tag
+
+let get_all_tags p =
+  let plus a1 a2 = match (a1, a2) with
+    | Some a1, Some a2 -> assert (a1 = a2); Some a1
+    | None, a | a, None -> a in
+  let arity_of_tag_guard { PA.method_arity; _ } = snd method_arity in
+  let f t gs rs =
+    let arities = List.map arity_of_tag_guard gs in
+    let arity = List.fold_left plus None arities in
+    (t, arity) :: rs in
+  Hashtbl.fold f (guards_of_tag p) []
+
+let gi_configuration f p =
+  fprintf f "@\nstatic private int state;";
+  for i = 0 to max_arity p - 1 do
+    (* TODO: Check if we need to specialize to bool, int, String.*)
+    fprintf f "@\nstatic private Object r%d;" i
+  done;
+  fprintf f "@\n@[<2>static void start() {";
+  let maybe_state n =
+    fprintf f   "@\nif (maybe()) state = %d;" n in
+  let init_state = function
+    | [] -> failwith "INTERNAL: vbkzpgbiuf"
+    | x :: xs -> fprintf f "@\nstate = %d;" x; List.iter maybe_state xs in
+  init_state (starts p);
+  for i = 0 to max_arity p - 1 do
+    fprintf f "@\nr%d = null;" i;
+  done;
+  fprintf f "@]@\n}"
+
+let gi_event p f (tag, arity) =
+  let arity = U.option 0 U.id arity in (* TODO: OK? *)
+  let f_arg f i = fprintf f ", Object l%d" i in
+  let a_arg f i = fprintf f ", l%d" i in
+  fprintf f "@\n@[<2>static void event_%d(Object n%a) {"
+    tag (U.pp_list "" f_arg) (U.range arity);
+  for state = 0 to Array.length p.vertices - 1 do begin
+    fprintf f "@\n";
+    if state > 0 then
+      fprintf f "else ";
+    fprintf f "if (state == %d) event_%d_state_%d(n%a);"
+      state tag state (U.pp_list "" a_arg) (U.range arity)
+  end done;
+  fprintf f "@]@\n}"
+
+let transitions_of_tag_vertex p tag vertex =
+  let gs = get_guards_of_tag p tag in
+  let ts = p.vertices.(vertex).outgoing_transitions in
+  let f t = match t.steps with
+    | [l]
+    | l :: _ -> (* XXX: REMOVE BRANCH -- this is just for debug *)
+        if not (List.mem l.PA.guard.PA.tag_guard gs) then [] else begin
+          [ l.PA.guard.PA.value_guards
+          , l.PA.action
+          , t.target ]
+        end
+    | _ -> failwith "INTERNAL: non-unit transitions are not supported (mnjwq)"
+  in
+  ts >>= f
+
+let gi_condition f conditions =
+  let one_condition = function
+    | PA.Variable (register, letter) ->
+        fprintf f " && r%d == l%d" register letter
+    | PA.Constant (literal, letter) ->
+        (* TODO: this probably needs to use .equals() for strings *)
+        fprintf f " && %s == l%d" literal letter in
+  fprintf f "true";
+  List.iter one_condition conditions
+
+let gi_action f actions =
+  let one_action (register, letter) =
+    fprintf f "@\nr%d = l%d;" register letter in
+  List.iter one_action actions
+
+let gi_event_state p f ((tag, arity), vertex) =
+  let is_error x =
+    p.vertices.(x).vertex_name = "error" in
+  let ts = transitions_of_tag_vertex p tag vertex in
+  let gi_maybe_transition b (condition, action, target) =
+    let gi_maybe f b =
+      if b then fprintf f "maybe() && " in
+    fprintf f "@]@\n@[<2>} else if (%a%a) {" gi_maybe b gi_condition condition;
+    fprintf f   "%a" gi_action action;
+    fprintf f   "@\nstate = %d;" target;
+    if is_error target then
+      fprintf f "@\nn.toString();"
+  in
+  let arity = U.option 0 U.id arity in (* TODO: OK? *)
+  let f_arg f i = fprintf f ", Object l%d" i in
+  fprintf f "@\n@[<2>static void event_%d_state_%d(Object n%a) {"
+    tag vertex (U.pp_list "" f_arg) (U.range arity);
+  fprintf f   "@\n@[<2>if (false) {";
+  List.iter (gi_maybe_transition true) ts;
+  List.iter (gi_maybe_transition false) ts;
+  fprintf f   "@]@\n}";
+  fprintf f "@]@\n}"
+
+let gi_automaton f p =
+  let ts = get_all_tags p in
+  let ss = U.pairs ts (U.range (Array.length p.vertices)) in
+  fprintf f "package topl;";
+  fprintf f "@\nimport java.util.Random;";
+  fprintf f "@\n@[<2>class Property {";
+  fprintf f   "%a" gi_configuration p;
+  fprintf f   "%a" (U.pp_list "" (gi_event p)) ts;
+  fprintf f   "%a" (U.pp_list "" (gi_event_state p)) ss;
+  fprintf f   "@\nstatic boolean maybe() { return random.nextBoolean(); }";
+  fprintf f   "@\nstatic Random random = new Random();";
+  fprintf f "@]@\n}"
+
+let generate_checkers_for_infer out_dir p =
+  check_automaton p;
+  let (/) = Filename.concat in
+  let topl_dir = out_dir/"topl" in
+  let jf = topl_dir/"Property.java" in
+  U.mkdir_p topl_dir;
+  let jc, j = U.open_formatter jf in
+  fprintf j "@[%a@.@]" gi_automaton p;
+  close_out_noerr jc;
+  U.compile out_dir jf
+
+(* }}} *)
 (* main *) (* {{{ *)
 
 let read_properties fs =
@@ -664,25 +813,10 @@ let check_work_directory d =
     if U.is_prefix dir here then raise e
   with Not_found -> raise e
 
-let instrument_class_infer _ _ x =
-  x (* TODO *)
-
-let generate_checkers_for_infer out_dir p =
-  check_automaton p;
-  let (/) = Filename.concat in
-  let topl_dir = out_dir/"topl" in
-  let jf = topl_dir/"Property.java" in
-  U.mkdir_p topl_dir;
-  let jc, j = U.open_formatter jf in
-  fprintf j "@[hi there@.@]";
-  close_out_noerr jc;
-  U.compile out_dir jf
-
-
 let instrument_class = ref instrument_class_for_runtime
 let generate_checkers = ref generate_checkers_for_runtime
 let use_infer () =
-  instrument_class := instrument_class_infer;
+  instrument_class := instrument_class_for_infer;
   generate_checkers := generate_checkers_for_infer
 
 let () =

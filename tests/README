@@ -1,0 +1,29 @@
+To add a test, create a new directory that contains at least these three files:
+  run       executable, typically a script
+  good.out  what should be printed on stdout
+  good.err  what should be printed on stderr
+
+In most cases you'd want to use the default script run, and a helper Config.java:
+  ( mkdir NEWTEST; cd NEWTEST; ln -s ../defaults/* . )
+Then you create dummy reference outputs:
+  touch NEWTEST/good.{out,err}
+Then you write your test. If you use defaults/run, as we are in this paragraph,
+then you must create two files:
+  NEWTEST/Main.java   the Java code to run
+  NEWTEST/prop.topl   the TOPL property to check
+Then run your new test:
+  ./test NEWTEST
+It should fail because we're using dummy reference outputs.
+
+When a test T fails (not necessarily a new one), do
+  diff -u T/out T/good.out
+  diff -u T/err T/good.err
+Also, inspect T/out and T/err. If you decide that T/out and T/err are OK,
+then use them as reference outputs:
+  cp T/out T/good.out
+  cp T/err T/good.err
+
+Finally, if you just run
+  ./test
+then the tests being run are those listen in ./alltests. So, do
+  echo NEWTEST >> alltests

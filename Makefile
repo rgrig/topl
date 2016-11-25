@@ -11,11 +11,11 @@ default: native
 
 byte:
 	@$(OCAMLBUILD) $(BYTES)
-	ln -sf toplc.byte toplc
+	cp toplc.byte toplc
 
 native:
 	@$(OCAMLBUILD) $(NATIVES)
-	ln -sf toplc.native toplc
+	cp toplc.native toplc
 
 lib:
 	@$(OCAMLBUILD) topl.cma topl.cmxa

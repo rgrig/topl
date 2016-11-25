@@ -3,7 +3,9 @@ package topl;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.ArrayDeque;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.IdentityHashMap;
 import java.util.Iterator;
@@ -93,9 +95,10 @@ public class Checker {
             }
             return hash;
         }
+        @SuppressWarnings("unchecked")
         @Override
         public boolean equals(Object other) {
-            Queue otherQueue = (Queue) other; // yes, exception wanted
+            Queue<T> otherQueue = (Queue<T>) other; // yes, exception wanted
             return
                 ((a == null) == (otherQueue.a == null))
                 && (a == null || a.equals(otherQueue.a))
@@ -363,9 +366,10 @@ public class Checker {
             return hash;
         }
 
+        @SuppressWarnings("unchecked")
         @Override
         public boolean equals(Object other) {
-            Treap otherTreap = (Treap) other; // yes, cast exception wanted
+            Treap<T> otherTreap = (Treap<T>) other; // yes, cast exception wanted
             return this == other ||
                 (hash == otherTreap.hash &&
                 equalIterators(iterator(), otherTreap.iterator()));
@@ -547,7 +551,7 @@ public class Checker {
         return r;
     }
 
-    static <T> boolean equalIterators(Iterator<T> i, Iterator j) {
+    static <T> boolean equalIterators(Iterator<T> i, Iterator<T> j) {
         while (i.hasNext() && j.hasNext()) {
             if (!i.next().equals(j.next())) { // yes, NullExc wanted
                 return false;
@@ -648,6 +652,11 @@ public class Checker {
             }
         }
 
+        static final long ROOT_ID = 0l;
+        static long idPool = ROOT_ID;
+        final long id;
+        public long id() { return id; }
+
         // These contribute to the identity of a State.
         final int vertex;
         final Treap<Binding> store;
@@ -661,12 +670,13 @@ public class Checker {
         int time;
 
         private State(int vertex, Treap<Binding> store, Queue<Event> events,
-                Parent parent, int time) {
+                Parent parent, int time, long id) {
             this.vertex = vertex;
             this.store = store;
             this.events = events;
             this.parent = parent;
             this.time = time;
+            this.id = id;
         }
 
         @Override
@@ -684,26 +694,27 @@ public class Checker {
 
         static State start(int vertex) {
             return new State(vertex, Treap.<Binding>empty(),
-                    Queue.<Event>empty(), null, 0);
+                    Queue.<Event>empty(), null, 0, ROOT_ID);
         }
 
         static State make(int vertex, Treap<Binding> store, Queue<Event> events,
                 Queue<Event> consumed, State parent) {
             return new State(vertex, store, events,
-                    new Parent(parent, consumed), parent.time + 1);
+                    new Parent(parent, consumed), parent.time + 1, ++idPool);
         }
 
         State pushEvent(Event event) {
-            return new State(vertex, store, events.push(event), parent, time);
+            return new State(
+                    vertex, store, events.push(event), parent, time, id);
         }
 
         State popEvent() {
-            return new State(vertex, store, events.pop(), parent, time);
+            return new State(vertex, store, events.pop(), parent, time, id);
         }
 
         public String toString () {
             StringBuilder sb = new StringBuilder();
-            sb.append("Verttex: " + vertex);
+            sb.append("Vertex: " + vertex);
             sb.append("\nStore:\n" + store);
             sb.append("\nEvents in queue:\n" + events);
             if (parent != null) {
@@ -1004,6 +1015,8 @@ public class Checker {
     // them easily accessible to users.
     public boolean captureCallStacks = false;
     public int historyLength = 10;
+    public boolean onlyLogEvents = false;
+    public PrintWriter automatonLog = null;
     public int statesLimit = 10;
     public SelectionStrategy selectionStrategy = SelectionStrategy.NEWEST;
 
@@ -1149,16 +1162,42 @@ public class Checker {
         }
     }
 
+    private void logEvent(Event event) {
+        assert onlyLogEvents;
+        if (printingIds == null) {
+            printingIds = new IdentityHashMap<Object, Integer>();
+        }
+        System.err.printf("TOPL LOG %s", automaton.eventNames[event.id]);
+        printValues(event.values);
+        System.err.println();
+    }
+
+    private void logAddState(State state) {
+        assert automatonLog != null;
+        automatonLog.printf("add_child %d %d%n",
+            state.parent.state.id(), state.id());
+    }
+
+    private void logDeactivateState(long stateId) {
+        assert automatonLog != null;
+        automatonLog.printf("deactivate %d%n", stateId);
+    }
+
     public synchronized void check(Event event) {
         try {
             if (!checkerEnabled) {
                 return;
             }
             checkerEnabled = false;
-            if (captureCallStacks) {
-                event.callStack = throwable.fillInStackTrace().getStackTrace();
+            if (onlyLogEvents) {
+                logEvent(event);
+            } else {
+                if (captureCallStacks) {
+                    throwable.fillInStackTrace();
+                    event.callStack = throwable.getStackTrace();
+                }
+                internalCheck(event);
             }
-            internalCheck(event);
             checkerEnabled = true;
         } catch (Throwable t) {
             System.err.println("TOPL: INTERNAL ERROR");
@@ -1235,6 +1274,7 @@ public class Checker {
                 State newState = State.make(transition.target, store,
                                             remaining, consumed, state);
                 newActiveStates.add(newState);
+                if (automatonLog != null) logAddState(newState);
 
                 String msg = automaton.errorMessages[transition.target];
                 if (msg != null) {
@@ -1247,17 +1287,16 @@ public class Checker {
             }
         }
 
-        states = newActiveStates;
-
         // Approximate.
-        if (states.size() > statesLimit) {
-            int i, from = 0;
-            State[] all = new State[states.size()];
-            i = 0;
-            for (State s : states) {
-                all[i++] = s;
+        if (newActiveStates.size() > statesLimit) {
+            int from = 0;
+            State[] all = new State[newActiveStates.size()];
+            {   int i = 0;
+                for (State s : newActiveStates) {
+                    all[i++] = s;
+                }
             }
-            states.clear();
+            newActiveStates.clear();
             switch (selectionStrategy) {
                 case RANDOM:
                     from = random.nextInt() % (all.length - statesLimit + 1);
@@ -1273,9 +1312,28 @@ public class Checker {
                 default:
                     assert false;
             }
-            states.add(all, from, from + statesLimit);
-            assert states.size() == statesLimit;
+            newActiveStates.add(all, from, from + statesLimit);
+            assert newActiveStates.size() == statesLimit;
         }
+
+        // Commit to new active states.
+        if (automatonLog != null) {
+            long[] oldIds = new long[states.size()];
+            long[] newIds = new long[newActiveStates.size()];
+            {   int i = 0;
+                for (State s : states) oldIds[i++] = s.id();
+                i = 0;
+                for (State s : newActiveStates) newIds[i++] = s.id();
+            }
+            Arrays.sort(oldIds);
+            Arrays.sort(newIds);
+            for (long i : oldIds) {
+                if (Arrays.binarySearch(newIds, i) < 0) {
+                    logDeactivateState(i);
+                }
+            }
+        }
+        states = newActiveStates;
 
         // Truncate traces (GC old states).
         operations += states.size();
@@ -1486,7 +1544,7 @@ public class Checker {
                     s.append(cap <= 0 || step.eventIds.size() <= cap ? eventIdsToString(step.eventIds) : "[" + step.eventIds.size() + " ids (>" + cap + ")]");
                     s.append(step.guard.toString());
                     s.append("<");
-                    for(Map.Entry a : step.action.assignments.entrySet()) {
+                    for(Map.Entry<Integer, Integer> a : step.action.assignments.entrySet()) {
                         s.append(a.getKey());
                         s.append(" <- ");
                         s.append(a.getValue());

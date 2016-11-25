@@ -35,10 +35,21 @@ let map_option f xs =
 
 let cons x xs = x :: xs
 
+let pairs xs ys =
+  let one_pair x y = (x, y) in
+  let f x = List.map (one_pair x) ys in
+  List.concat (List.map f xs)
+
 let unique l =
   let h = Hashtbl.create 0 in
   List.iter (fun x -> Hashtbl.replace h x x) l;
   Hashtbl.fold (fun _ -> cons) h []
+
+let range n =
+  let rec loop acc = function
+    | 0 -> acc
+    | n -> loop (n - 1 :: acc) (n - 1) in
+  loop [] n
 
 let fold_with_index f init xs =
   let g (i, acc) x = succ i, f acc i x in
@@ -160,6 +171,11 @@ let fs_filter p f =
   let r = ref [] in
   fs_postorder (fun x -> if p x then r := x::!r) f; !r
 
+let open_formatter n =
+  let c = open_out n in
+  let f = formatter_of_out_channel c in
+  (c, f)
+
 let rm_r dir =
   let delete f =
     if Sys.is_directory f then Unix.rmdir f
@@ -216,10 +232,15 @@ let mk_tmp_dir p s =
 let command_escape s =
   "\"" ^ s ^ "\""
 
+let compile sourcepath f =
+  let u = command_escape in
+  let c = Printf.sprintf "javac -sourcepath %s %s" (u sourcepath) (u f) in
+  ignore (Sys.command c)
+
 (* It is *unlikely* that the returned name is of an existing file. *)
 let temp_path prefix =
   Filename.concat
-    (Filename.temp_dir_name)
+    (Filename.get_temp_dir_name ())
     (Printf.sprintf "%s%Lx"
       prefix
       (Int64.of_float (1000.0 *. Unix.gettimeofday ())))

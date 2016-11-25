@@ -9,7 +9,7 @@ type 'a with_line = { ast : 'a; line : int }
 
 type vertex = string
 
-(* p_str = Str.regexp p_re *)
+(* p_string = Str.regexp p_re *)
 type pattern =
   { p_re : Str.regexp
   ; p_string : string }

@@ -3,12 +3,12 @@ RUN mkdir /topl-related
 WORKDIR /topl-related
 RUN apt-get -y update && apt-get -y install \
   autoconf \
-  camlzip \
   cppo \
   default-jdk \
   emacs24-nox \
   git \
   libcamomile-ocaml-dev \
+  libzip-ocaml-dev \
   make \
   menhir \
   ocaml-findlib \

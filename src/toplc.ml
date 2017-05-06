@@ -75,23 +75,23 @@ type automaton =
   ; event_names : (int, string) Hashtbl.t }
 
 (* following function produces an automaton with epsilon transitions *)
-    
-let to_simple_automaton automaton x =
+
+let to_simple_automaton x =
   let d =
     let lfolder i x = max i (List.length x.steps) in
     let afolder j y = max j (List.fold_left lfolder 0 y.outgoing_transitions) in
     Array.fold_left afolder 0 x.vertices in
   if d==0 then failwith "TODO : Automaton with d=0";
-  let max = d * d * (Array.length x.vertices) in
-  let to_name (id, h, k) = id*d*d + h*d + k in
+(*   let max = d * d * (Array.length x.vertices) in *)
+(*   let to_name (id, h, k) = id*d*d + h*d + k in *)
   let add_vertex_data vacc vd =
     let old_trs = vd.outgoing_transitions in
-    let eval_tr tr h k = failwith "TODO" in
+    let eval_tr _tr _h _k = failwith "TODO" in
     let get_trs trs h k tacc =
       let skip_trs =
-        failwith "TODO"        
+        failwith "TODO"
       in
-      List.fold_left (fun acc tr -> (eval_tr tr h k) :: tacc) skip_trs trs
+      List.fold_left (fun _acc tr -> (eval_tr tr h k) :: tacc) skip_trs trs
     in
     let rec loop i j acc =
       if j == d then loop (i+1) 0 acc else
@@ -101,15 +101,15 @@ let to_simple_automaton automaton x =
     { vertex_property = vd.vertex_property;
       vertex_name = vd.vertex_name;
       outgoing_transitions = (loop 0 0 [])} :: vacc
-  in 
+  in
   let new_vertices = Array.of_list (Array.fold_left add_vertex_data [] x.vertices)
   in
   { vertices = new_vertices;
     observables = x.observables;
     pattern_tags = x.pattern_tags;
     event_names = x.event_names }
-  
-    
+
+
 let check_automaton x =
   let rec is_decreasing x = function
     | [] -> true
@@ -746,7 +746,7 @@ let gi_event p f (tag, arity) =
   let arity = U.option 0 U.id arity in (* TODO: OK? *)
   let f_arg f i = fprintf f ", Object l%d" i in
   let a_arg f i = fprintf f ", l%d" i in
-  fprintf f "@\n@[<2>static void event_%d(Object n%a) {"
+  fprintf f "@\n@[<2>public static void event_%d(Object n%a) {"
     tag (U.pp_list "" f_arg) (U.range arity);
   for state = 0 to Array.length p.vertices - 1 do begin
     fprintf f "@\n";
@@ -815,7 +815,7 @@ let gi_automaton f p =
   let ss = U.pairs ts (U.range (Array.length p.vertices)) in
   fprintf f "package topl;";
   fprintf f "@\nimport java.util.Random;";
-  fprintf f "@\n@[<2>class Property {";
+  fprintf f "@\n@[<2>public class Property {";
   fprintf f   "%a" gi_configuration p;
   fprintf f   "%a" (U.pp_list "" (gi_event p)) ts;
   fprintf f   "%a" (U.pp_list "" (gi_event_state p)) ss;

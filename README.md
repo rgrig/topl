@@ -10,6 +10,11 @@ Then try
     ls examples
     ./toplc -help
 
+If you want to have access to the current directory while in the docker image,
+say
+
+    docker run -v $PWD:$PWD -ti rgrig/topl
+
 To setup a development environment, do what
   [Dockerfile](https://github.com/rgrig/topl/blob/master/Dockerfile) says.
 Compile with `make`,

@@ -1,0 +1,2 @@
+export TOPL_DIR=$(pwd)
+export PATH=$TOPL_DIR:$PATH

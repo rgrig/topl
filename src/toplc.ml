@@ -714,13 +714,10 @@ let get_guards_of_tag p tag =
   Hashtbl.find (guards_of_tag p) tag
 
 let get_all_tags p =
-  let plus a1 a2 = match (a1, a2) with
-    | Some a1, Some a2 -> assert (a1 = a2); Some a1
-    | None, a | a, None -> a in
-  let arity_of_tag_guard { PA.method_arity; _ } = snd method_arity in
+  let arity_of_tag_guard { PA.method_arity; _ } = fst method_arity in
   let f t gs rs =
     let arities = List.map arity_of_tag_guard gs in
-    let arity = List.fold_left plus None arities in
+    let arity = List.fold_left max 0 arities in
     (t, arity) :: rs in
   Hashtbl.fold f (guards_of_tag p) []
 
@@ -743,17 +740,16 @@ let gi_configuration f p =
   fprintf f "@]@\n}"
 
 let gi_event p f (tag, arity) =
-  let arity = U.option 0 U.id arity in (* TODO: OK? *)
-  let f_arg f i = fprintf f ", Object l%d" i in
-  let a_arg f i = fprintf f ", l%d" i in
-  fprintf f "@\n@[<2>public static void event_%d(Object n%a) {"
-    tag (U.pp_list "" f_arg) (U.range arity);
+  let f_arg f i = fprintf f "Object l%d" i in
+  let a_arg f i = fprintf f "l%d" i in
+  fprintf f "@\n@[<2>public static void event_%d(%a) {"
+    tag (U.pp_list ", " f_arg) (U.range arity);
   for state = 0 to Array.length p.vertices - 1 do begin
     fprintf f "@\n";
     if state > 0 then
       fprintf f "else ";
-    fprintf f "if (state == %d) event_%d_state_%d(n%a);"
-      state tag state (U.pp_list "" a_arg) (U.range arity)
+    fprintf f "if (state == %d) event_%d_state_%d(%a);"
+      state tag state (U.pp_list ", " a_arg) (U.range arity)
   end done;
   fprintf f "@]@\n}"
 
@@ -798,12 +794,12 @@ let gi_event_state p f ((tag, arity), vertex) =
     fprintf f   "%a" gi_action action;
     fprintf f   "@\nstate = %d;" target;
     if is_error target then
-      fprintf f "@\nn.toString();"
+      fprintf f "@\nwhile (true);"
   in
-  let arity = U.option 0 U.id arity in (* TODO: OK? *)
-  let f_arg f i = fprintf f ", Object l%d" i in
-  fprintf f "@\n@[<2>static void event_%d_state_%d(Object n%a) {"
-    tag vertex (U.pp_list "" f_arg) (U.range arity);
+(*   eprintf "@[arity %d@]@." arity; *)
+  let f_arg f i = fprintf f "Object l%d" i in
+  fprintf f "@\n@[<2>static void event_%d_state_%d(%a) {"
+    tag vertex (U.pp_list ", " f_arg) (U.range arity);
   fprintf f   "@\n@[<2>if (false) {";
   List.iter (gi_maybe_transition true) ts;
   List.iter (gi_maybe_transition false) ts;

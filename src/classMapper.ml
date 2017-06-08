@@ -37,7 +37,8 @@ let open_class fn =
       | B.ClassFile.Exception e ->
 	eprintf "@[dec %s: %s@." fn (B.ClassFile.string_of_error e);
 	None
-      | _ -> eprintf "@[dec %s: error@." fn; None in
+      | e -> raise e; None in
+(*       | _ -> eprintf "@[dec %s: error@." fn; None in *)
   try
     let ch = open_in fn in
     let cd = read_class_channel ch in
@@ -49,7 +50,7 @@ let output_class version fn c =
   let ch = open_out fn in
   let re m =
     close_out_noerr ch;
-    eprintf "@[enc %s: %s@]@\n" fn m;
+    eprintf "@[enc %s: %s@]@." fn m;
     false in
   try
     let bytes = B.Coder.encode (c, version) in
@@ -62,7 +63,9 @@ let output_class version fn c =
     | B.AccessFlag.Exception e -> re (B.AccessFlag.string_of_error e)
     | BH.Exception e -> re (B.Coder.string_of_error e)
     | Sys_error m -> re ("syserror: " ^ m)
-    | _ -> re "unknown"
+(*    | e -> printf "%s@\nbt: %s@."
+      (Printexc.to_string e) (Printexc.get_backtrace ()); false *)
+(* XXX    | _ -> re "unknown" *)
 
 let rec map in_dir out_dir f =
   let process_jar jf =
@@ -95,10 +98,11 @@ let rec map in_dir out_dir f =
     if log_cm then printf "@\n@[<2>map class: %s" (in_dir / fn);
     let copy () = U.cp (in_dir / fn) (out_dir / fn) in
     (match open_class (in_dir / fn) with
-      | None -> copy ()
+      | None -> printf "FAIL FOO@."; copy ()
       | Some (cd, version) ->
           let inst_cd = f cd in
-          if not (output_class version (out_dir / fn) inst_cd) then copy ());
+          if not (output_class version (out_dir / fn) inst_cd)
+          then (printf "FAIL BAR@."; copy ()));
     if log_cm then printf "@]" in
   let process _ fn =
     if log_cm then printf "@\n@[<2>map: %s" (in_dir / fn);

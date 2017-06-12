@@ -14,6 +14,7 @@ module U = Util
 (* }}} *)
 (* globals *) (* {{{ *)
 let out_dir = ref "out"
+let using_infer = ref false
 
 (* }}} *)
 (* used to communicate between conversion and instrumentation *) (* {{{ *)
@@ -502,10 +503,12 @@ let bc_store i = function
 let bc_dup t =
   [ if BD.size t = 2 then BH.DUP2 else BH.DUP ]
 
+let as_for_parameter = function
+  | #BD.for_parameter as t -> t
+  | _ -> failwith "INTERNAL(owwqr): expecting non-void"
+
 let bc_array_set l a t =
-  let t = match t with
-    | #BD.for_parameter as t' -> t'
-    | _ -> failwith "INTERNAL: trying to record a void" in
+  let t = as_for_parameter t in
   List.concat
     [ [ BH.DUP ]
     ; bc_ldc_int a
@@ -526,7 +529,7 @@ let bc_call_checker =
   [ BH.INVOKESTATIC (`Methodref (`Class_or_interface
       property, check, ([`Class event], `Void) )) ]
 
-let bc_emit id values = match id with
+let bc_emit_for_runtime id values = match id with
   | None -> []
   | Some id ->
       let rec set j acc = function
@@ -537,6 +540,26 @@ let bc_emit id values = match id with
         ; set 0 [] values
         ; bc_new_event id
         ; bc_call_checker ]
+
+let bc_emit_for_infer id values = match id with
+  | None -> []
+  | Some id ->
+      let rec loop_load acc = function
+        | [] -> List.concat (List.rev acc)
+        | (i, t) :: xs -> loop_load (bc_load i t :: acc) xs in
+      let call_monitor () =
+        let args = List.map (as_for_parameter @< snd) values in
+        let mname = utf8_for_method (sprintf "event_%d" id) in
+        [ BH.INVOKESTATIC (`Methodref (`Class_or_interface
+          property, mname, (args, `Void) )) ] in
+      List.concat
+        [ loop_load [] values
+        ; call_monitor () ]
+
+let bc_emit id values =
+  if !using_infer
+  then bc_emit_for_infer id values
+  else bc_emit_for_runtime id values
 
 (* }}} *)
 
@@ -669,7 +692,7 @@ let pp_class f c =
   let n = B.Name.internal_utf8_for_class c.BH.c_name in
   fprintf f "@[%s@]" (B.Utils.UTF8.to_string n)
 
-let instrument_class_for_runtime get_tag h c =
+let instrument_class get_tag h c =
   if log_cp then printf "@\n@[<2>begin instrument %a" pp_class c;
   let instrumented_methods =
     List.map (instrument_method get_tag h c.BH.c_name) c.BH.c_methods in
@@ -688,9 +711,6 @@ let compute_inheritance in_dir =
 
 (* }}} *)
 (* generate static monitor *) (* {{{ *)
-
-let instrument_class_for_infer =
-  instrument_class_for_runtime (* TODO XXX *)
 
 let max_arity p =
   let arity_of_tag_guard { PA.method_arity; _ } = fst method_arity in
@@ -714,7 +734,10 @@ let get_guards_of_tag p tag =
   Hashtbl.find (guards_of_tag p) tag
 
 let get_all_tags p =
-  let arity_of_tag_guard { PA.method_arity; _ } = fst method_arity in
+  let arity_of_tag_guard = function
+    | { PA.event_type = None; _ } -> 0 (* TODO: ok? *)
+    | { PA.event_type = Some PA.Return; _ } -> 1 (* TODO: void? *)
+    | { PA.method_arity; _ } -> fst method_arity in
   let f t gs rs =
     let arities = List.map arity_of_tag_guard gs in
     let arity = List.fold_left max 0 arities in
@@ -727,7 +750,7 @@ let gi_configuration f p =
     (* TODO: Check if we need to specialize to bool, int, String.*)
     fprintf f "@\nstatic private Object r%d;" i
   done;
-  fprintf f "@\n@[<2>static void start() {";
+  fprintf f "@\n@[<2>static public void start() {";
   let maybe_state n =
     fprintf f   "@\nif (maybe()) state = %d;" n in
   let init_state = function
@@ -737,7 +760,8 @@ let gi_configuration f p =
   for i = 0 to max_arity p - 1 do
     fprintf f "@\nr%d = null;" i;
   done;
-  fprintf f "@]@\n}"
+  fprintf f "@]@\n}";
+  fprintf f "@\n@[<2>static public void stop() {}@]@\n"
 
 let gi_event p f (tag, arity) =
   let f_arg f i = fprintf f "Object l%d" i in
@@ -845,10 +869,9 @@ let check_work_directory d =
     if U.is_prefix dir here then raise e
   with Not_found -> raise e
 
-let instrument_class = ref instrument_class_for_runtime
 let generate_checkers = ref generate_checkers_for_runtime
 let use_infer () =
-  instrument_class := instrument_class_for_infer;
+  using_infer := true;
   generate_checkers := generate_checkers_for_infer
 
 let () =
@@ -879,7 +902,7 @@ let () =
     let ps = read_properties !fs in
     let h = compute_inheritance in_dir in
     let p = transform_properties ps in
-    ClassMapper.map in_dir tmp_dir (!instrument_class (get_tag p) h);
+    ClassMapper.map in_dir tmp_dir (instrument_class (get_tag p) h);
     !generate_checkers tmp_dir p;
     U.rm_r out_dir;
     U.rename tmp_dir out_dir;

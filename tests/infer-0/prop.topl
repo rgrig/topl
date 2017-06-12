@@ -1,0 +1,7 @@
+property NoTwoGos
+  observe <*>
+  prefix <O>
+  start -> start: *
+  start -> track: X := get()
+  track -> once: x.go()
+  once -> error: x.go()

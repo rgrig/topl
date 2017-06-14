@@ -28,6 +28,12 @@ type ('event_type, 'method_name, 'method_arity) tag =
   ; method_arity : 'method_arity }
   (* Common shape for [tag_guard] and [event_tag]. *)
 
+(* arities for patterns:
+  *.foo[*]   -> [1,oo)  -> (1, None)
+  foo[*]     -> [0,oo)  -> (0, None)
+  *.foo(*.*) -> [3,3]   -> (3, Some 3)
+  foo()      -> [0,0]   -> (0, Some 0)
+*)
 type 'method_name tag_guard =
   ((event_type option), 'method_name, (int * int option)) tag
 

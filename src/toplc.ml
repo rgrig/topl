@@ -73,43 +73,10 @@ type automaton =
   (* The keys of [pattern_tags] are filled in during the initial conversion,
     but the values (the tag list) is filled in while the code is being
     instrumented. *)
-  ; event_names : (int, string) Hashtbl.t }
+  ; event_names : (tag, string) Hashtbl.t
+  ; event_arities : (tag, int) Hashtbl.t }
 
 (* following function produces an automaton with epsilon transitions *)
-
-let to_simple_automaton x =
-  let d =
-    let lfolder i x = max i (List.length x.steps) in
-    let afolder j y = max j (List.fold_left lfolder 0 y.outgoing_transitions) in
-    Array.fold_left afolder 0 x.vertices in
-  if d==0 then failwith "TODO : Automaton with d=0";
-(*   let max = d * d * (Array.length x.vertices) in *)
-(*   let to_name (id, h, k) = id*d*d + h*d + k in *)
-  let add_vertex_data vacc vd =
-    let old_trs = vd.outgoing_transitions in
-    let eval_tr _tr _h _k = failwith "TODO" in
-    let get_trs trs h k tacc =
-      let skip_trs =
-        failwith "TODO"
-      in
-      List.fold_left (fun _acc tr -> (eval_tr tr h k) :: tacc) skip_trs trs
-    in
-    let rec loop i j acc =
-      if j == d then loop (i+1) 0 acc else
-        if i == d then acc else
-          loop i (j+1) (get_trs old_trs i j acc)
-    in
-    { vertex_property = vd.vertex_property;
-      vertex_name = vd.vertex_name;
-      outgoing_transitions = (loop 0 0 [])} :: vacc
-  in
-  let new_vertices = Array.of_list (Array.fold_left add_vertex_data [] x.vertices)
-  in
-  { vertices = new_vertices;
-    observables = x.observables;
-    pattern_tags = x.pattern_tags;
-    event_names = x.event_names }
-
 
 let check_automaton x =
   let rec is_decreasing x = function
@@ -360,7 +327,8 @@ let transform_properties ps =
     { vertices = inverse_index mk_vd iov
     ; observables = Hashtbl.create 0
     ; pattern_tags = Hashtbl.create 0
-    ; event_names = Hashtbl.create 0 } in
+    ; event_names = Hashtbl.create 0
+    ; event_arities = Hashtbl.create 0 } in
   let add_obs_tags p =
     let obs_tag =
       { PA.event_type = None
@@ -586,7 +554,7 @@ let does_method_match
 
 let get_tag x =
   let cnt = ref (-1) in
-  fun t (mns, ma) mn ->
+  fun t (mns, ma) mn ea ->
     let en = (* event name *)
       fprintf str_formatter "%a %s" PA.pp_event_type t mn;
       flush_str_formatter () in
@@ -603,6 +571,7 @@ let get_tag x =
               if log_mm then
                 printf "added tag %d\n" !cnt;
               Hashtbl.replace x.pattern_tags p (!cnt :: ts);
+              Hashtbl.replace x.event_arities !cnt ea;
               Hashtbl.replace x.event_names !cnt en in
             List.iter at ps;
             Some !cnt
@@ -670,15 +639,17 @@ let get_overrides h c m =
 let instrument_method get_tag h c m =
   let method_name = bm_name m in
   let arguments = bm_parameters c m in
+  let return = bm_return c m in
   let method_arity = List.length arguments in
+  let return_arity = if return <> `Void then 1 else 0 in
   let overrides = get_overrides h c {method_name; method_arity} in
   let full_method_name = mk_full_method_name c method_name in
   let ic = instrument_code
     (bm_is_init m)
-    (get_tag PA.Call overrides full_method_name)
-    (get_tag PA.Return overrides full_method_name)
+    (get_tag PA.Call overrides full_method_name method_arity)
+    (get_tag PA.Return overrides full_method_name return_arity)
     arguments
-    (bm_return c m)
+    return
     (bm_locals_count m) in
   let ia xs =
     (* NOTE: Uses, but doesn't update cv_type_of_local. *)
@@ -734,15 +705,8 @@ let get_guards_of_tag p tag =
   Hashtbl.find (guards_of_tag p) tag
 
 let get_all_tags p =
-  let arity_of_tag_guard = function
-    | { PA.event_type = None; _ } -> 0 (* TODO: ok? *)
-    | { PA.event_type = Some PA.Return; _ } -> 1 (* TODO: void? *)
-    | { PA.method_arity; _ } -> fst method_arity in
-  let f t gs rs =
-    let arities = List.map arity_of_tag_guard gs in
-    let arity = List.fold_left max 0 arities in
-    (t, arity) :: rs in
-  Hashtbl.fold f (guards_of_tag p) []
+  let f tag ma xs = (tag, ma) :: xs in
+  Hashtbl.fold f p.event_arities []
 
 let gi_configuration f p =
   fprintf f "@\nstatic private int state;";

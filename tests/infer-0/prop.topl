@@ -1,5 +1,5 @@
 property NoTwoGos
-  observe <*>
+  observe <O.*>
   prefix <O>
   start -> start: *
   start -> track: X := get()

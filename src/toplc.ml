@@ -66,6 +66,8 @@ type vertex_data =
   ; vertex_name : PA.vertex
   ; outgoing_transitions : transition list }
 
+type ev_argtype = (int * BD.non_void_java_type)
+
 type automaton =
   { vertices : vertex_data array
   ; observables : (property, tag_guard) Hashtbl.t
@@ -74,7 +76,7 @@ type automaton =
     but the values (the tag list) is filled in while the code is being
     instrumented. *)
   ; event_names : (tag, string) Hashtbl.t
-  ; event_arities : (tag, int) Hashtbl.t }
+  ; event_argtypes : (tag, ev_argtype list) Hashtbl.t }
 
 (* following function produces an automaton with epsilon transitions *)
 
@@ -328,7 +330,7 @@ let transform_properties ps =
     ; observables = Hashtbl.create 0
     ; pattern_tags = Hashtbl.create 0
     ; event_names = Hashtbl.create 0
-    ; event_arities = Hashtbl.create 0 } in
+    ; event_argtypes = Hashtbl.create 0 } in
   let add_obs_tags p =
     let obs_tag =
       { PA.event_type = None
@@ -425,20 +427,26 @@ let bc_new_object_array size = List.concat
   [ bc_ldc_int size
   ; [ BH.ANEWARRAY (`Class_or_interface java_lang_Object) ] ]
 
+let name_of_nonvoid_box = function
+  | `Boolean -> "Boolean"
+  | `Byte -> "Byte"
+  | `Char -> "Character"
+  | `Double -> "Double"
+  | `Float -> "Float"
+  | `Int -> "Integer"
+  | `Long -> "Long"
+  | `Short -> "Short"
+  | _ -> failwith "expecting a boxable type (iryku)"
+
+let rec name_of_nonvoid = function
+  | `Array t -> name_of_nonvoid t ^ "[]"
+  | `Class c -> BU.UTF8.to_string (B.Name.printable_utf8_for_class c)
+  | t -> name_of_nonvoid_box t
+
 let bc_box = function
   | `Class _ | `Array _ -> []
   | t ->
-      let c = utf8_for_class ("java.lang." ^ (match t with
-        | `Boolean -> "Boolean"
-        | `Byte -> "Byte"
-        | `Char -> "Character"
-        | `Double -> "Double"
-        | `Float -> "Float"
-        | `Int -> "Integer"
-        | `Long -> "Long"
-        | `Short -> "Short"
-        | _ -> failwith "foo"))
-        in
+      let c = utf8_for_class ("java.lang." ^ (name_of_nonvoid_box t)) in
       [BH.INVOKESTATIC (`Methodref
           (`Class_or_interface c,
 	  utf8_for_method "valueOf",
@@ -471,12 +479,12 @@ let bc_store i = function
 let bc_dup t =
   [ if BD.size t = 2 then BH.DUP2 else BH.DUP ]
 
-let as_for_parameter = function
-  | #BD.for_parameter as t -> t
+let as_nonvoid = function
+  | #BD.non_void_java_type as t -> t
   | _ -> failwith "INTERNAL(owwqr): expecting non-void"
 
 let bc_array_set l a t =
-  let t = as_for_parameter t in
+  let t = as_nonvoid t in
   List.concat
     [ [ BH.DUP ]
     ; bc_ldc_int a
@@ -516,7 +524,9 @@ let bc_emit_for_infer id values = match id with
         | [] -> List.concat (List.rev acc)
         | (i, t) :: xs -> loop_load (bc_load i t :: acc) xs in
       let call_monitor () =
-        let args = List.map (as_for_parameter @< snd) values in
+(*         let args = List.map (as_nonvoid @< snd) values in *)
+        let args = List.map (fun _ -> `Class java_lang_Object) values in
+          (* types ignored on purpose!*)
         let mname = utf8_for_method (sprintf "event_%d" id) in
         [ BH.INVOKESTATIC (`Methodref (`Class_or_interface
           property, mname, (args, `Void) )) ] in
@@ -554,7 +564,7 @@ let does_method_match
 
 let get_tag x =
   let cnt = ref (-1) in
-  fun t (mns, ma) mn ea ->
+  fun t (mns, ma) mn et ->
     let en = (* event name *)
       fprintf str_formatter "%a %s" PA.pp_event_type t mn;
       flush_str_formatter () in
@@ -571,7 +581,7 @@ let get_tag x =
               if log_mm then
                 printf "added tag %d\n" !cnt;
               Hashtbl.replace x.pattern_tags p (!cnt :: ts);
-              Hashtbl.replace x.event_arities !cnt ea;
+              Hashtbl.replace x.event_argtypes !cnt et;
               Hashtbl.replace x.event_names !cnt en in
             List.iter at ps;
             Some !cnt
@@ -640,14 +650,17 @@ let instrument_method get_tag h c m =
   let method_name = bm_name m in
   let arguments = bm_parameters c m in
   let return = bm_return c m in
+  let return_event_types =
+    if return <> `Void
+    then [(0, as_nonvoid return)]
+    else [] in
   let method_arity = List.length arguments in
-  let return_arity = if return <> `Void then 1 else 0 in
   let overrides = get_overrides h c {method_name; method_arity} in
   let full_method_name = mk_full_method_name c method_name in
   let ic = instrument_code
     (bm_is_init m)
-    (get_tag PA.Call overrides full_method_name method_arity)
-    (get_tag PA.Return overrides full_method_name return_arity)
+    (get_tag PA.Call overrides full_method_name arguments)
+    (get_tag PA.Return overrides full_method_name return_event_types)
     arguments
     return
     (bm_locals_count m) in
@@ -705,8 +718,8 @@ let get_guards_of_tag p tag =
   Hashtbl.find (guards_of_tag p) tag
 
 let get_all_tags p =
-  let f tag ma xs = (tag, ma) :: xs in
-  Hashtbl.fold f p.event_arities []
+  let f tag ts xs = (tag, ts) :: xs in
+  Hashtbl.fold f p.event_argtypes []
 
 let gi_configuration f p =
   fprintf f "@\nstatic private int state;";
@@ -727,17 +740,30 @@ let gi_configuration f p =
   fprintf f "@]@\n}";
   fprintf f "@\n@[<2>static public void stop() {}@]@\n"
 
-let gi_event p f (tag, arity) =
-  let f_arg f i = fprintf f "Object l%d" i in
-  let a_arg f i = fprintf f "l%d" i in
+(*
+  To support arrays, we (probably) need to change the bytecode instrumentation
+  so that arrays are somehow cast to Object. Note that the monitor cannot
+  refer to private types/classes in the program it verifies, so that's why
+  we should use either Object or, perhaps, Object[].
+ *)
+let warn_if_array =
+  let d = ref false in
+  let w = function
+    | `Array _ -> d := true; eprintf "W: arrays not supported!"
+    | _ -> () in
+  (function t -> if not !d then w t)
+
+let gi_event p f (tag, ts) =
+  let f_arg f (i, t) = warn_if_array t; fprintf f "Object l%d" i in
+  let a_arg f (i, _) = fprintf f "l%d" i in
   fprintf f "@\n@[<2>public static void event_%d(%a) {"
-    tag (U.pp_list ", " f_arg) (U.range arity);
+    tag (U.pp_list ", " f_arg) ts;
   for state = 0 to Array.length p.vertices - 1 do begin
     fprintf f "@\n";
     if state > 0 then
       fprintf f "else ";
     fprintf f "if (state == %d) event_%d_state_%d(%a);"
-      state tag state (U.pp_list ", " a_arg) (U.range arity)
+      state tag state (U.pp_list ", " a_arg) ts
   end done;
   fprintf f "@]@\n}"
 
@@ -771,10 +797,10 @@ let gi_action f actions =
     fprintf f "@\nr%d = l%d;" register letter in
   List.iter one_action actions
 
-let gi_event_state p f ((tag, arity), vertex) =
+let gi_event_state p f ((tag, ts), vertex) =
   let is_error x =
     p.vertices.(x).vertex_name = "error" in
-  let ts = transitions_of_tag_vertex p tag vertex in
+  let transitions = transitions_of_tag_vertex p tag vertex in
   let gi_maybe_transition b (condition, action, target) =
     let gi_maybe f b =
       if b then fprintf f "maybe() && " in
@@ -784,13 +810,12 @@ let gi_event_state p f ((tag, arity), vertex) =
     if is_error target then
       fprintf f "@\nwhile (true);"
   in
-(*   eprintf "@[arity %d@]@." arity; *)
-  let f_arg f i = fprintf f "Object l%d" i in
+  let f_arg f (i, t) = warn_if_array t; fprintf f "Object l%d" i in
   fprintf f "@\n@[<2>static void event_%d_state_%d(%a) {"
-    tag vertex (U.pp_list ", " f_arg) (U.range arity);
+    tag vertex (U.pp_list ", " f_arg) ts;
   fprintf f   "@\n@[<2>if (false) {";
-  List.iter (gi_maybe_transition true) ts;
-  List.iter (gi_maybe_transition false) ts;
+  List.iter (gi_maybe_transition true) transitions;
+  List.iter (gi_maybe_transition false) transitions;
   fprintf f   "@]@\n}";
   fprintf f "@]@\n}"
 

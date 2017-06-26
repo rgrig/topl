@@ -524,9 +524,8 @@ let bc_emit_for_infer id values = match id with
         | [] -> List.concat (List.rev acc)
         | (i, t) :: xs -> loop_load (bc_load i t :: acc) xs in
       let call_monitor () =
-(*         let args = List.map (as_nonvoid @< snd) values in *)
+        (* NOTE: The type Object should match with what is in the monitor. *)
         let args = List.map (fun _ -> `Class java_lang_Object) values in
-          (* types ignored on purpose!*)
         let mname = utf8_for_method (sprintf "event_%d" id) in
         [ BH.INVOKESTATIC (`Methodref (`Class_or_interface
           property, mname, (args, `Void) )) ] in
@@ -749,7 +748,7 @@ let gi_configuration f p =
 let warn_if_array =
   let d = ref false in
   let w = function
-    | `Array _ -> d := true; eprintf "W: arrays not supported!"
+    | `Array _ -> d := true; eprintf "@[W: arrays not supported!@]@."
     | _ -> () in
   (function t -> if not !d then w t)
 

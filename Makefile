@@ -31,8 +31,13 @@ test: default
 	@cd tests; ./test -c
 
 checker:
-	@mkdir -p classes
-	@javac -sourcepath src src/topl/*.java -Xlint:all -d classes
+	@mkdir -p classes/checker
+	@javac -sourcepath src src/topl/*.java -Xlint:all -d classes/checker
+
+infer-compiler:
+	@mkdir -p classes/infer-compiler
+	@javac -sourcepath src src/infer/*.java -Xlint:all -d classes/infer-compiler
+	@cd classes/infer-compiler; jar cfe ../toplc.jar infer.Compile $$(find . -type f)
 
 clean:
 	@$(OCAMLBUILD) -clean

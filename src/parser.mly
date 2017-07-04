@@ -21,7 +21,7 @@
     | I_transitions of (string, variable, value) PA.transition list
 
   let is_action s = 'A' <= s.[0] && s.[0] < 'Z'
-  let var = String.uncapitalize
+  let var = String.uncapitalize_ascii
 
   let re_of_glob_map =
     let f m (k, v) = U.CharMap.add k v m in

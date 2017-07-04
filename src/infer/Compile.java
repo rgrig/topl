@@ -68,7 +68,7 @@ public class Compile {
       }
       javacArgs = xs;
       if (outDirName != null) {
-        System.out.printf("W: ignoring original -d (%s)\n", outDirName);
+        System.out.printf("TOPL: ignoring original -d (%s)\n", outDirName);
       }
     }
 
@@ -82,10 +82,12 @@ public class Compile {
       javacCommand.add("-d");
       javacCommand.add(outDirPath.toString());
       ProcessBuilder javacBuilder = new ProcessBuilder(javacCommand);
-      javacBuilder.redirectError(javacErr);
+      javacBuilder.redirectErrorStream(true).redirectOutput(javacErr);
       Process javac = javacBuilder.start();
       int result = javac.waitFor();
-      if (result != 0) bail("javac returned nonzero error code");
+      if (result != 0) failedCommand(result, javacCommand);
+      System.out.printf(
+        "TOPL: javac finished successfully. Output in %s\n", outDirPath);
     }
 
     // === Step 2 ===
@@ -93,12 +95,13 @@ public class Compile {
       Files.move(outDirPath, inDirPath);
       List<String> toplcCommand = new ArrayList<>();
       toplcCommand.addAll(Arrays.asList(
-          "toplc", "-s", "-i", inDirPath.toString(), "-o", outDirPath.toString()));
+        "toplc", "-s", "-i", inDirPath.toString(), "-o", outDirPath.toString()));
       toplcCommand.addAll(toplProperties);
       ProcessBuilder toplcBuilder = new ProcessBuilder(toplcCommand);
       Process toplc = toplcBuilder.start();
       int result = toplc.waitFor();
-      if (result != 0) bail("toplc returned nonzero error code");
+      if (result != 0) failedCommand(result, toplcCommand);
+      System.out.printf("TOPL: toplc finished successfully.\n");
     }
 
 
@@ -126,6 +129,7 @@ public class Compile {
         { while (true) {
             String line = br.readLine();
             if (line == null) break;
+            if (line.length() == 0) bail("empty line in argfile");
             if (line.startsWith("'")) line = line.substring(1, line.length() - 1);
             ys.add(line);
           }
@@ -135,6 +139,13 @@ public class Compile {
       }
     }
     return ys;
+  }
+
+  static void failedCommand(int result, List<String> command) {
+    System.out.printf("failed (errorcode %d) to run:\n", result);
+    for (String a : command) System.out.printf(" %s", a);
+    System.out.printf("\n");
+    bail("command returned nonzero error code");
   }
 
   static void bail(String message) {

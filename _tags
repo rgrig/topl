@@ -8,6 +8,3 @@ true: use_menhir
 true: annot
 true: debug
 #true: profile
-
-# workaround for http://caml.inria.fr/mantis/view.php?id=5039
-<*.cmxa>: -linkpkg

@@ -37,8 +37,8 @@ let open_class fn =
       | B.ClassFile.Exception e ->
 	eprintf "@[dec %s: %s@." fn (B.ClassFile.string_of_error e);
 	None
-      | e -> raise e; None in
-(*       | _ -> eprintf "@[dec %s: error@." fn; None in *)
+(*       | e -> raise e; None in *)
+      | _ -> eprintf "@[dec %s: error@." fn; None in
   try
     let ch = open_in fn in
     let cd = read_class_channel ch in

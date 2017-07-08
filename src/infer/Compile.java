@@ -33,7 +33,7 @@ public class Compile {
     try { go(args); }
     catch (Exception e) {
       e.printStackTrace();
-      bail("Exception.");
+      bail(String.format("Exception (%s).", e));
     }
   }
 

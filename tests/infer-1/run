@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# FIXME
+rm -rf indir outdir
+mkdir -p indir
+javac Main.java -d indir
+toplc -s -i indir -o outdir prop.topl
+javac Config.java -cp outdir -d outdir
+#java -cp outdir Config

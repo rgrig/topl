@@ -1,0 +1,33 @@
+property StaticBigArity
+  observe <Bad.*>
+  prefix <Bad>
+  start -> start: *
+  start -> a: s4(*, *, *, X)
+  a -> error: s4(*, *, *, x)
+
+property BadConstructor
+  observe <Bad.*>
+  start -> start: *
+  start -> a: <Bad.\<init\>>(X, *, *)
+  a -> error: call *.i4(*,x,*,*)
+
+property BadArg
+  observe <Bad.*>
+  prefix <Bad>
+  start -> start: *
+  start -> a: s4(X, *, *, *)
+  a -> error: *.i4(*, x, *, *)
+
+property BadOnBad
+  observe <Bad.*>
+  prefix <Bad>
+  start -> start: *
+  start -> a: s4(X, *, *, *)
+  a -> error: x.*
+
+property InstanceBigArity
+  observe <Bad.*>
+  prefix <Bad>
+  start -> start: *
+  start -> a: Y.i4(*, *, *, X)
+  a -> error: y.i4(*, *, *, x)

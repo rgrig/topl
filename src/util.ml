@@ -55,10 +55,6 @@ let fold_with_index f init xs =
   let g (i, acc) x = succ i, f acc i x in
   snd (List.fold_left g (0, init) xs)
 
-let map_with_index f xs =
-  let g acc i x = f i x :: acc in
-  List.rev (fold_with_index g [] xs)
-
 let hashtbl_fold_keys f h z =
   let f k _ = f k in
   Hashtbl.fold f h z

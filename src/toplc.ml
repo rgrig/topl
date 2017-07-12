@@ -647,7 +647,9 @@ let get_overrides h c m =
 
 let instrument_method get_tag h c m =
   let method_name = bm_name m in
-  let arguments = bm_parameters c m in
+  let arguments = bm_parameters c m in (* int is java bytecode local *)
+  let topl_numbering i (_, t) = (i, t) in (* topl numbering always from 0 *)
+  let arguments_topl = List.mapi topl_numbering arguments in
   let return = bm_return c m in
   let return_event_types =
     if return <> `Void
@@ -658,7 +660,7 @@ let instrument_method get_tag h c m =
   let full_method_name = mk_full_method_name c method_name in
   let ic = instrument_code
     (bm_is_init m)
-    (get_tag PA.Call overrides full_method_name arguments)
+    (get_tag PA.Call overrides full_method_name arguments_topl)
     (get_tag PA.Return overrides full_method_name return_event_types)
     arguments
     return

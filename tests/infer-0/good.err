@@ -1,0 +1,20 @@
+Capturing in javac mode...
+Found 2 source files to analyze in /home/rg/research/code/topl/tests/infer-0/infer-out
+Starting analysis...
+
+legend:
+  "F" analyzing a file
+  "." analyzing a procedure
+
+FF.........................................
+Found 1 issue
+
+Main.java:18: warning: PRECONDITION_NOT_MET
+  in call to `go()` at line 18.
+  16.       y.go();
+  17.       x.go();
+  18. >     x.go();
+  19.     }
+  20.   }
+
+

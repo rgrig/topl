@@ -2,6 +2,8 @@ arity
 arity-static
 constructor
 fail
+infer-0
+infer-1
 longarg
 self
 twoprops

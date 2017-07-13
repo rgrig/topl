@@ -697,10 +697,14 @@ let compute_inheritance in_dir =
 (* }}} *)
 (* generate static monitor *) (* {{{ *)
 
-let max_arity p =
-  let arity_of_tag_guard { PA.method_arity; _ } = fst method_arity in
-  let f tg n = max (arity_of_tag_guard tg) n in
-  U.hashtbl_fold_keys f p.pattern_tags 0
+let get_registers p =
+  let module S = U.IntSet in (* set of registers/variables *)
+  let gr_oa rs (r, _) = S.add r rs in
+  let gr_a rs xs = List.fold_left gr_oa rs xs in
+  let gr_l rs l = gr_a rs PropAst.(l.action) in
+  let gr_t rs t = List.fold_left gr_l rs t.steps in
+  let gr_vd rs v = List.fold_left gr_t rs v.outgoing_transitions in
+  S.elements (Array.fold_left gr_vd S.empty p.vertices)
 
 let guards_of_tag_cache = Hashtbl.create 1
 let guards_of_tag p =
@@ -723,11 +727,14 @@ let get_all_tags p =
   Hashtbl.fold f p.event_argtypes []
 
 let gi_configuration f p =
-  fprintf f "@\nstatic private int state;";
-  for i = 0 to max_arity p - 1 do
+  let registers = get_registers p in
+  let declare_register i = 
     (* TODO: Check if we need to specialize to bool, int, String.*)
-    fprintf f "@\nstatic private Object r%d;" i
-  done;
+    fprintf f "@\nstatic private Object r%d;" i in
+  let init_register i =
+    fprintf f "@\nr%d = null;" i in
+  fprintf f "@\nstatic private int state;";
+  List.iter declare_register registers;
   fprintf f "@\n@[<2>static public void start() {";
   let maybe_state n =
     fprintf f   "@\nif (maybe()) state = %d;" n in
@@ -735,9 +742,7 @@ let gi_configuration f p =
     | [] -> failwith "INTERNAL: vbkzpgbiuf"
     | x :: xs -> fprintf f "@\nstate = %d;" x; List.iter maybe_state xs in
   init_state (starts p);
-  for i = 0 to max_arity p - 1 do
-    fprintf f "@\nr%d = null;" i;
-  done;
+  List.iter init_register registers;
   fprintf f "@]@\n}";
   fprintf f "@\n@[<2>static public void stop() {}@]@\n"
 

@@ -23,7 +23,7 @@ property BadOnBad
   prefix <Bad>
   start -> start: *
   start -> a: s4(X, *, *, *)
-  a -> error: x.*
+  a -> error: x.*   // see #51
 
 property InstanceBigArity
   observe <Bad.*>

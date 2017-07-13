@@ -27,7 +27,7 @@ install-lib: lib
 	@ocamlfind install topl META $(addprefix _build/topl.,cmi cma cmxa a)
 	@rm -f META
 
-test: default
+test: default infer-compiler
 	@cd tests; ./test -c
 
 checker:

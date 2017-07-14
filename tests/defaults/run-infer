@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+mkdir -p outdir
+infer --developer-mode --java-jar-compiler $TOPL_DIR/classes/toplc.jar -- java Main.java -d outdir prop.topl

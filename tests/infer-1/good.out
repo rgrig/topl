@@ -1,4 +1,2 @@
-
-Summary of the reports
-
-  PRECONDITION_NOT_MET: 2
+Main.java:12: WARNING: PRECONDITION_NOT_MET in call to `Bad(...)` at line 12.
+Main.java:13: WARNING: PRECONDITION_NOT_MET in call to `i4(...)` at line 13.

@@ -1,4 +1,1 @@
-
-Summary of the reports
-
-  PRECONDITION_NOT_MET: 1
+Main.java:18: WARNING: PRECONDITION_NOT_MET in call to `go()` at line 18.

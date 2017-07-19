@@ -1,0 +1,9 @@
+property IterateTaint
+  observe <T.*>
+  prefix <T>
+  start -> start: *
+  start -> loop:  S := create()
+  loop -> loop:   *
+  loop -> loop:   S := chain(s, *)
+  loop -> loop:   S := chain(*, s)
+  loop -> error:  s.bad()

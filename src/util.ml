@@ -228,10 +228,17 @@ let mk_tmp_dir p s =
 let command_escape s =
   "\"" ^ s ^ "\""
 
-let compile sourcepath f =
+let compile classpath sourcepath outdir fs =
   let u = command_escape in
-  let c = Printf.sprintf "javac -sourcepath %s %s" (u sourcepath) (u f) in
-  ignore (Sys.command c)
+  let cmd = Buffer.create 128 in
+  Printf.bprintf cmd "javac";
+  Printf.bprintf cmd " -classpath %s" (u classpath);
+  Printf.bprintf cmd " -sourcepath %s" (u sourcepath);
+  Printf.bprintf cmd " -d %s" (u outdir);
+  let src f = Printf.bprintf cmd " %s" (u f) in
+  List.iter src fs;
+  let open Operators in
+  cmd >> Buffer.contents >> Sys.command >> ignore
 
 (* It is *unlikely* that the returned name is of an existing file. *)
 let temp_path prefix =

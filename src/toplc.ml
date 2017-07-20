@@ -272,7 +272,7 @@ let pp_strings_nonl f index =
     Printf.fprintf f "%s\n" s
   done
 
-let generate_checkers_for_runtime out_dir p =
+let generate_checkers_for_runtime out_dir extra_fs p =
   check_automaton p;
   let (/) = Filename.concat in
   U.cp_r (Config.topl_dir/"src"/"topl") out_dir;
@@ -281,11 +281,11 @@ let generate_checkers_for_runtime out_dir p =
   let (jc, j), (tc, t) = o "java", o "text" in
   let sc = open_out (topl_dir/"Property.strings") in
   let index = mk_pp_index p in
-  fprintf j "@[%a@." pp_constants_table index;
+  fprintf j "@[%a@]@." pp_constants_table index;
   pp_strings_nonl sc index;
-  fprintf t "@[%a@." (pp_automaton index) p;
+  fprintf t "@[%a@]@." (pp_automaton index) p;
   List.iter close_out_noerr [jc; tc; sc];
-  U.compile out_dir (topl_dir/"Property.java")
+  U.compile out_dir out_dir out_dir ((topl_dir/"Property.java") :: extra_fs)
 
 (* }}} *)
 (* conversion to Java representation *) (* {{{ *)
@@ -838,7 +838,7 @@ let gi_automaton f p =
   fprintf f   "@\nstatic Random random = new Random();";
   fprintf f "@]@\n}"
 
-let generate_checkers_for_infer out_dir p =
+let generate_checkers_for_infer out_dir extra_fs p =
   check_automaton p;
   let (/) = Filename.concat in
   let topl_dir = out_dir/"topl" in
@@ -847,7 +847,7 @@ let generate_checkers_for_infer out_dir p =
   let jc, j = U.open_formatter jf in
   fprintf j "@[%a@.@]" gi_automaton p;
   close_out_noerr jc;
-  U.compile out_dir jf
+  U.compile out_dir out_dir out_dir (jf :: extra_fs)
 
 (* }}} *)
 (* main *) (* {{{ *)
@@ -875,6 +875,8 @@ let () =
     "usage: %s -i <dir> [-o <dir>] <topls>" Sys.argv.(0) in
   try
     let fs = ref [] in
+    let extra_fs = ref [] in
+    let set_extra_source f = extra_fs := f :: !extra_fs in
     let in_dir = ref None in
     let out_dir = ref None in
     let set_dir r v = match !r with
@@ -882,6 +884,7 @@ let () =
       | None -> r := Some v in
     Arg.parse
       [ "-s", Arg.Unit use_infer, "generate infer checkers"
+      ; "-e", Arg.String set_extra_source, "sources that refer to topl.Property"
       ; "-i", Arg.String (set_dir in_dir), "input directory"
       ; "-o", Arg.String (set_dir out_dir), "output directory" ]
       (fun x -> fs := x :: !fs)
@@ -898,7 +901,7 @@ let () =
     let h = compute_inheritance in_dir in
     let p = transform_properties ps in
     ClassMapper.map in_dir tmp_dir (instrument_class (get_tag p) h);
-    !generate_checkers tmp_dir p;
+    !generate_checkers tmp_dir !extra_fs p;
     U.rm_r out_dir;
     U.rename tmp_dir out_dir;
     printf "@."

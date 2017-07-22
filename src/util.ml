@@ -231,12 +231,13 @@ let command_escape s =
 let compile classpath sourcepath outdir fs =
   let u = command_escape in
   let cmd = Buffer.create 128 in
-  Printf.bprintf cmd "javac";
+  Printf.bprintf cmd "javac -verbose";
   Printf.bprintf cmd " -classpath %s" (u classpath);
   Printf.bprintf cmd " -sourcepath %s" (u sourcepath);
   Printf.bprintf cmd " -d %s" (u outdir);
   let src f = Printf.bprintf cmd " %s" (u f) in
   List.iter src fs;
+  Printf.bprintf cmd " 2> javac.err.topl";
   let open Operators in
   cmd >> Buffer.contents >> Sys.command >> ignore
 

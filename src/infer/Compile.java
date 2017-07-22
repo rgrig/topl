@@ -26,6 +26,12 @@ as a 'compiler' that
     - toplc -s -i inDir -o outDir props.topl
   3. prints the stderr produced in step (1) by javac.
     - also fake Property.java and Property.class (in outDir)
+
+Sometimes the user wants to provide a wrapper that initializes the TOPL property
+and then runs the main function of the project being verified. To facilitate
+this, file names ending in ".java.topl" are stripped of ".topl" and then sent to
+toplc in the -e option. In other words, the get compiled after toplc generates
+the monitor, because they refer to it.
 */
 public class Compile {
   public static void main(String[] args)
@@ -39,12 +45,14 @@ public class Compile {
 
   static void go(String[] args) throws IOException, InterruptedException {
     // === Step 1 ===
+    List<String> toplJava = new ArrayList<>();
     List<String> toplProperties = new ArrayList<>();
     List<String> javacArgs = expandArgFile(args);
     { List<String> xs = new ArrayList<>();
       for (String a : javacArgs) {
-        // FIXME: use some better hack for distinguishing options?
-        if (a.endsWith(".topl")) {
+        if (a.endsWith(".java.topl")) {
+          toplJava.add(a.substring(0, a.length() - ".topl".length()));
+        } else if (a.endsWith(".topl")) {
           toplProperties.add(a);
         } else {
           xs.add(a);
@@ -82,6 +90,7 @@ public class Compile {
       javacCommand.add("-d");
       javacCommand.add(outDirPath.toString());
       ProcessBuilder javacBuilder = new ProcessBuilder(javacCommand);
+      // NOTE: Slight variations of the next line cause deadlocks. Careful.
       javacBuilder.redirectErrorStream(true).redirectOutput(javacErr);
       Process javac = javacBuilder.start();
       int result = javac.waitFor();
@@ -94,8 +103,13 @@ public class Compile {
     { Files.delete(inDirPath);
       Files.move(outDirPath, inDirPath);
       List<String> toplcCommand = new ArrayList<>();
+      toplcCommand.add("toplc");
+      for (String j : toplJava) {
+        toplcCommand.add("-e");
+        toplcCommand.add(j);
+      }
       toplcCommand.addAll(Arrays.asList(
-        "toplc", "-s", "-i", inDirPath.toString(), "-o", outDirPath.toString()));
+        "-s", "-i", inDirPath.toString(), "-o", outDirPath.toString()));
       toplcCommand.addAll(toplProperties);
       ProcessBuilder toplcBuilder = new ProcessBuilder(toplcCommand);
       Process toplc = toplcBuilder.start();
@@ -106,11 +120,16 @@ public class Compile {
 
 
     // === Step 3 ===
+    try (BufferedReader r = new BufferedReader(new FileReader("javac.err.topl"))) {
+      // FIXME: brittle: util.ml and this file rely on a common constant
+      // "java.err.topl"
+      while (true) {
+        String line = r.readLine();
+        if (line == null) break;
+        System.err.println(line);
+      }
+    }
     try (BufferedReader r = new BufferedReader(new FileReader(javacErr))) {
-      System.err.printf("[parsing started RegularFileObject[%s]]\n",
-        outDirPath.resolve("topl").resolve("Property.java"));
-      System.err.printf("[wrote RegularFileObject[%s]]\n",
-        outDirPath.resolve("topl").resolve("Property.class"));
       while (true) {
         String line = r.readLine();
         if (line == null) break;

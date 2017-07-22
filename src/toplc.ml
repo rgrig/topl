@@ -895,19 +895,18 @@ let () =
     end;
     if !out_dir = None then out_dir := !in_dir;
     let in_dir, out_dir = U.from_some !in_dir, U.from_some !out_dir in
-    let tmp_dir = U.temp_path "toplc_" in
-    List.iter check_work_directory [in_dir; out_dir; tmp_dir];
+    let backup_dir = U.temp_path "toplc_backup_" in
+    List.iter check_work_directory [in_dir; out_dir];
+    if Sys.file_exists out_dir then U.rename out_dir backup_dir;
     let ps = read_properties !fs in
     let h = compute_inheritance in_dir in
     let p = transform_properties ps in
-    ClassMapper.map in_dir tmp_dir (instrument_class (get_tag p) h);
-    !generate_checkers tmp_dir !extra_fs p;
-    U.rm_r out_dir;
-    U.rename tmp_dir out_dir;
+    ClassMapper.map in_dir out_dir (instrument_class (get_tag p) h);
+    !generate_checkers out_dir !extra_fs p;
     printf "@."
   with
     | Helper.Parsing_failed m
     | Sys_error m
-        -> eprintf "@[ERROR: %s@." m
+        -> eprintf "@[ERROR: %s@." m;
 
 (* }}} *)

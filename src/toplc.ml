@@ -764,6 +764,10 @@ let gi_event p f (tag, ts) =
   let a_arg f (i, _) = fprintf f "l%d" i in
   fprintf f "@\n@[<2>public static void event_%d(%a) {"
     tag (U.pp_list ", " f_arg) ts;
+  let hint_hack i =
+    fprintf f "if (r%d != null) r%d.hashCode();@\n" i i in
+  fprintf f "@\n";
+  List.iter hint_hack (get_registers p);
   for state = 0 to Array.length p.vertices - 1 do begin
     fprintf f "@\n";
     if state > 0 then

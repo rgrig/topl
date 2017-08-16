@@ -7,3 +7,4 @@ property IterateTaint
   loop -> loop:   S := chain(s, *)
   loop -> loop:   S := chain(*, s)
   loop -> error:  s.bad()
+  error -> error: *

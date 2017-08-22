@@ -1,8 +1,11 @@
+*infer-out*
 /*.native
 /.vimrc
-/TODO
 /_build
 /classes
+/experiments
 /mail.tmp
 /tags
+/TODO
 /work.tmp
+javac.err.topl

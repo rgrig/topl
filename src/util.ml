@@ -100,7 +100,7 @@ let pp_list sep pp_element =
   let rec pp = fun f -> function
     | [] -> ()
     | [x] -> pp_element f x
-    | x :: xs -> fprintf f "@[%a@]%s@," pp_element x sep; pp f xs in
+    | x :: xs -> fprintf f "%a%s@," pp_element x sep; pp f xs in
   pp
 
 let pp_option pp_e ppf = function

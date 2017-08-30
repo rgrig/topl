@@ -728,7 +728,7 @@ let get_all_tags p =
 
 let gi_configuration f p =
   let registers = get_registers p in
-  let declare_register i = 
+  let declare_register i =
     (* TODO: Check if we need to specialize to bool, int, String.*)
     fprintf f "@\nstatic private Object r%d;" i in
   let init_register i =
@@ -744,7 +744,34 @@ let gi_configuration f p =
   init_state (starts p);
   List.iter init_register registers;
   fprintf f "@]@\n}";
-  fprintf f "@\n@[<2>static public void stop() {}@]@\n"
+  fprintf f "@\n@[<2>static public void stop() {}@]"
+
+let get_max_transition_length p =
+  let t z x = max z (List.length x.steps) in
+  let vd z x = List.fold_left t z x.outgoing_transitions in
+  Array.fold_left vd 1 p.vertices
+
+let get_max_arity p =
+  let open PropAst in
+  let a z (_, x) = max z x in
+  let vg z = function
+    | Variable (_, x) | Constant (_, x) -> max z x in
+  let l z x =
+    let z = List.fold_left a z x.action in
+    List.fold_left vg z x.guard.value_guards in
+  let t z x = List.fold_left l z x.steps in
+  let vd z x = List.fold_left t z x.outgoing_transitions in
+  1 + Array.fold_left vd 0 p.vertices
+
+let gi_letter f m i =
+  let component j = fprintf f "@\nObject q%dl%d;" i j in
+  fprintf f "@\nint q%dtag;" i;
+  List.iter component (U.range m)
+
+let gi_queue f p =
+  let n = get_max_transition_length p in
+  let m = get_max_arity p in
+  List.iter (gi_letter f m) (U.range n)
 
 (*
   To support arrays, we (probably) need to change the bytecode instrumentation
@@ -761,13 +788,25 @@ let warn_if_array =
 
 let gi_event p f (tag, ts) =
   let f_arg f (i, t) = warn_if_array t; fprintf f "Object l%d" i in
-  let a_arg f (i, _) = fprintf f "l%d" i in
+(* XXX  let a_arg f (i, _) = fprintf f "l%d" i in *)
   fprintf f "@\n@[<2>public static void event_%d(%a) {"
     tag (U.pp_list ", " f_arg) ts;
   let hint_hack i =
-    fprintf f "if (r%d != null) r%d.hashCode();@\n" i i in
-  fprintf f "@\n";
+    fprintf f "@\nif (r%d != null) r%d.hashCode();" i i in
   List.iter hint_hack (get_registers p);
+  let m = List.length ts in (* XXX check! *)
+  let n = get_max_transition_length p in
+  for i = n - 1 downto 1 do begin
+    let copy_component j = fprintf f "@\nq%dl%d = q%dl%d;" i j (i-1) j in
+    fprintf f "@\nq%dtag = q%dtag;" i (i - 1);
+    List.iter copy_component (U.range m)
+  end done;
+  let save_component j = fprintf f "@\nq0l%d = l%d;" j j in
+  fprintf f "@\nq0tag = %d;" tag;
+  List.iter save_component (U.range m);
+  let execute _ = fprintf f "@\nexecute();" in
+  List.iter execute (U.range n);
+(* XXX do in execute
   for state = 0 to Array.length p.vertices - 1 do begin
     fprintf f "@\n";
     if state > 0 then
@@ -775,6 +814,7 @@ let gi_event p f (tag, ts) =
     fprintf f "if (state == %d) event_%d_state_%d(%a);"
       state tag state (U.pp_list ", " a_arg) ts
   end done;
+*)
   fprintf f "@]@\n}"
 
 let transitions_of_tag_vertex p tag vertex =
@@ -836,6 +876,7 @@ let gi_automaton f p =
   fprintf f "@\nimport java.util.Random;";
   fprintf f "@\n@[<2>public class Property {";
   fprintf f   "%a" gi_configuration p;
+  fprintf f   "%a" gi_queue p;
   fprintf f   "%a" (U.pp_list "" (gi_event p)) ts;
   fprintf f   "%a" (U.pp_list "" (gi_event_state p)) ss;
   fprintf f   "@\nstatic boolean maybe() { return random.nextBoolean(); }";

@@ -743,6 +743,7 @@ let gi_configuration f p =
     | x :: xs -> fprintf f "@\nstate = %d;" x; List.iter maybe_state xs in
   init_state (starts p);
   List.iter init_register registers;
+  fprintf f "@\nq_size = 0;";
   fprintf f "@]@\n}";
   fprintf f "@\n@[<2>static public void stop() {}@]"
 
@@ -771,7 +772,8 @@ let gi_letter f m i =
 let gi_queue f p =
   let n = get_max_transition_length p in
   let m = get_max_arity p in
-  List.iter (gi_letter f m) (U.range n)
+  List.iter (gi_letter f m) (U.range n);
+  fprintf f "@\nint q_size;"
 
 (*
   To support arrays, we (probably) need to change the bytecode instrumentation
@@ -791,19 +793,28 @@ let gi_event p f (tag, ts) =
 (* XXX  let a_arg f (i, _) = fprintf f "l%d" i in *)
   fprintf f "@\n@[<2>public static void event_%d(%a) {"
     tag (U.pp_list ", " f_arg) ts;
+(* XXX remove
   let hint_hack i =
     fprintf f "@\nif (r%d != null) r%d.hashCode();" i i in
   List.iter hint_hack (get_registers p);
+*)
+  let mm = get_max_arity p in
   let m = List.length ts in (* XXX check! *)
   let n = get_max_transition_length p in
+  let ppq f i = fprintf f "q_size == %d" i in
+  fprintf f "@\nif (!(%a)) { while (true); }"
+    (U.pp_list " || " ppq) (U.range (n - 1));
   for i = n - 1 downto 1 do begin
     let copy_component j = fprintf f "@\nq%dl%d = q%dl%d;" i j (i-1) j in
     fprintf f "@\nq%dtag = q%dtag;" i (i - 1);
     List.iter copy_component (U.range m)
   end done;
   let save_component j = fprintf f "@\nq0l%d = l%d;" j j in
+  let null_component j = fprintf f "@\nq0l%d = null;" j in
   fprintf f "@\nq0tag = %d;" tag;
   List.iter save_component (U.range m);
+  List.iter null_component (U.range2 (m+1) mm);
+  fprintf f "@\n++q_size;";
   let execute _ = fprintf f "@\nexecute();" in
   List.iter execute (U.range n);
 (* XXX do in execute
@@ -869,6 +880,13 @@ let gi_event_state p f ((tag, ts), vertex) =
   fprintf f   "@]@\n}";
   fprintf f "@]@\n}"
 
+let gi_execute f p =
+  fprintf f "@\n@[<2>static void execute() {";
+  let gn i = p.vertices.(i).vertex_name in
+  let pe i = fprintf f "@\nexecute_state%d(); // %s" i (gn i) in
+  List.iter pe (U.range (Array.length p.vertices));
+  fprintf f "@]@\n}"
+
 let gi_automaton f p =
   let ts = get_all_tags p in
   let ss = U.pairs ts (U.range (Array.length p.vertices)) in
@@ -878,6 +896,7 @@ let gi_automaton f p =
   fprintf f   "%a" gi_configuration p;
   fprintf f   "%a" gi_queue p;
   fprintf f   "%a" (U.pp_list "" (gi_event p)) ts;
+  fprintf f   "%a" gi_execute p;
   fprintf f   "%a" (U.pp_list "" (gi_event_state p)) ss;
   fprintf f   "@\nstatic boolean maybe() { return random.nextBoolean(); }";
   fprintf f   "@\nstatic Random random = new Random();";
@@ -915,6 +934,7 @@ let use_infer () =
   generate_checkers := generate_checkers_for_infer
 
 let () =
+  Format.set_margin 80;
   printf "@[";
   let usage = Printf.sprintf
     "usage: %s -i <dir> [-o <dir>] <topls>" Sys.argv.(0) in

@@ -73,8 +73,7 @@ type automaton =
   ; observables : (property, tag_guard) Hashtbl.t
   ; pattern_tags : (tag_guard, tag list) Hashtbl.t
   (* The keys of [pattern_tags] are filled in during the initial conversion,
-    but the values (the tag list) is filled in while the code is being
-    instrumented. *)
+    but the values (the tag list) are filled in during code instrumentation. *)
   ; event_names : (tag, string) Hashtbl.t
   ; event_argtypes : (tag, ev_argtype list) Hashtbl.t }
 
@@ -747,10 +746,17 @@ let gi_configuration f p =
   fprintf f "@]@\n}";
   fprintf f "@\n@[<2>static public void stop() {}@]"
 
-let get_max_transition_length p =
+let all_vertices p =
+  U.range (Array.length p.vertices)
+
+let get_vertex_length p v =
   let t z x = max z (List.length x.steps) in
-  let vd z x = List.fold_left t z x.outgoing_transitions in
-  Array.fold_left vd 1 p.vertices
+  List.fold_left t 1 p.vertices.(v).outgoing_transitions
+
+let get_max_transition_length p =
+  let vs = all_vertices p in
+  let ms = List.map (get_vertex_length p) vs in
+  List.fold_left max 1 ms
 
 let get_max_arity p =
   let open PropAst in
@@ -880,16 +886,87 @@ let gi_event_state p f ((tag, ts), vertex) =
   fprintf f   "@]@\n}";
   fprintf f "@]@\n}"
 
+let gi_execute_state_queue f p vertex q_size =
+  let gi_condition f steps =
+    let rec loop time register_map = function
+      | [] -> ()
+      | l :: ls ->
+          let reg v =
+            try
+              let time, i = Util.IntMap.find v register_map in
+              sprintf "q%dl%d" time i
+            with Not_found ->
+              sprintf "r%d" v in
+          let ppt f tid = fprintf f "q%dtag == %d" time tid in
+          let tags = Hashtbl.find p.pattern_tags PropAst.(l.guard.tag_guard) in
+          fprintf f " && (%a)" (U.pp_list " || " ppt) tags;
+          let ppg = PropAst.(function
+            | Variable (v, i) ->
+                fprintf f " && %s == q%dl%d" (reg v) time i
+            | Constant (c, i) -> (* XXX use 'equals' for strings *)
+                fprintf f " && %s == q%dl%d" c time i) in
+          List.iter ppg PropAst.(l.guard.value_guards);
+          let do_action register_map (v, i) =
+            Util.IntMap.add v (time, i) register_map in
+          let register_map =
+            List.fold_left do_action register_map PropAst.(l.action) in
+          loop (time - 1) register_map ls in
+    loop (q_size - 1) Util.IntMap.empty steps in
+  let gi_action f steps =
+    let rec loop time = function
+      | [] -> ()
+      | l :: ls ->
+          let pp (v, i) = fprintf f "@\nr%d = q%dl%d;" v time i in
+          List.iter pp PropAst.(l.action);
+          loop (time - 1) ls in
+    loop (q_size - 1) steps in
+  let gi_maybe_transition maybe t =
+    let is_error x =
+      p.vertices.(x).vertex_name = "error" in
+    let m = if maybe then "maybe()" else "true" in
+    fprintf f "else if (%s%a) {" m gi_condition t.steps;
+    fprintf f   "%a" gi_action t.steps;
+    fprintf f   "@\nstate = %d;" t.target;
+    fprintf f   "@\nq_size -= %d;" (List.length t.steps);
+    if is_error t.target then fprintf f "@\nwhile (true);";
+    fprintf f "@]@\n@[<2>} " in
+  let transitions = p.vertices.(vertex).outgoing_transitions in
+  fprintf f "@\n@[<2>static void execute_state%d_q%d() {" vertex q_size;
+  fprintf f   "@\nif (!(state == %d)) { while (true); }" vertex;
+  fprintf f   "@\nif (!(q_size == %d)) { while (true); }" q_size;
+  fprintf f   "@\nif (false) {@\n@[<2>} ";
+  List.iter (gi_maybe_transition true) transitions;
+  List.iter (gi_maybe_transition false) transitions;
+  fprintf f   "else {";
+  fprintf f     "@\nq_size -= 1; // skip";
+  fprintf f   "@]@\n}";
+  fprintf f "@]@\n}"
+
+let gi_execute_state p f vertex =
+  let nn = get_max_transition_length p in
+  let n = get_vertex_length p vertex in
+  let qs = U.range2 n (nn + 1) in
+  let ppq i =
+    fprintf f "@\nelse if (q_size == %d) execute_state%d_q%d();" i vertex i in
+  fprintf f "@\n@[<2>static void execute_state%d() { // %s"
+    vertex p.vertices.(vertex).vertex_name;
+  fprintf f   "@\nif (!(state == %d)) return;" vertex;
+  fprintf f   "@\nif (false) {}";
+  List.iter ppq qs;
+  fprintf f   "@\nelse { while (true); }";
+  fprintf f "@]@\n}";
+  List.iter (gi_execute_state_queue f p vertex) qs
+
 let gi_execute f p =
   fprintf f "@\n@[<2>static void execute() {";
   let gn i = p.vertices.(i).vertex_name in
   let pe i = fprintf f "@\nexecute_state%d(); // %s" i (gn i) in
-  List.iter pe (U.range (Array.length p.vertices));
+  List.iter pe (all_vertices p);
   fprintf f "@]@\n}"
 
 let gi_automaton f p =
   let ts = get_all_tags p in
-  let ss = U.pairs ts (U.range (Array.length p.vertices)) in
+  let ss = all_vertices p in
   fprintf f "package topl;";
   fprintf f "@\nimport java.util.Random;";
   fprintf f "@\n@[<2>public class Property {";
@@ -897,7 +974,7 @@ let gi_automaton f p =
   fprintf f   "%a" gi_queue p;
   fprintf f   "%a" (U.pp_list "" (gi_event p)) ts;
   fprintf f   "%a" gi_execute p;
-  fprintf f   "%a" (U.pp_list "" (gi_event_state p)) ss;
+  fprintf f   "%a" (U.pp_list "" (gi_execute_state p)) ss;
   fprintf f   "@\nstatic boolean maybe() { return random.nextBoolean(); }";
   fprintf f   "@\nstatic Random random = new Random();";
   fprintf f "@]@\n}"

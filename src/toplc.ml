@@ -771,15 +771,15 @@ let get_max_arity p =
   1 + Array.fold_left vd 0 p.vertices
 
 let gi_letter f m i =
-  let component j = fprintf f "@\nObject q%dl%d;" i j in
-  fprintf f "@\nint q%dtag;" i;
+  let component j = fprintf f "@\nstatic Object q%dl%d;" i j in
+  fprintf f "@\nstatic int q%dtag;" i;
   List.iter component (U.range m)
 
 let gi_queue f p =
   let n = get_max_transition_length p in
   let m = get_max_arity p in
   List.iter (gi_letter f m) (U.range n);
-  fprintf f "@\nint q_size;"
+  fprintf f "@\nstatic int q_size;"
 
 (*
   To support arrays, we (probably) need to change the bytecode instrumentation

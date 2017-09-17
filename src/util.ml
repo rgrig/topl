@@ -45,6 +45,17 @@ let unique l =
   List.iter (fun x -> Hashtbl.replace h x x) l;
   Hashtbl.fold (fun _ -> cons) h []
 
+(* "[1;3;2;5]"  -> [1,4) u [5,6) *)
+let intervals xs =
+  let xs = List.sort compare xs in
+  let rec loop ps a b = function
+    | [] -> (a, b+1) :: ps
+    | x :: xs when x = b + 1 || x = b -> loop ps a x xs
+    | x :: xs -> loop ((a, b+1)::ps) x x xs in
+  (match xs with
+  | [] -> []
+  | x :: xs -> loop [] x x xs)
+
 let range2 m n =
   let rec loop acc n =
     if n <= m then acc else loop (n - 1 :: acc) (n - 1) in

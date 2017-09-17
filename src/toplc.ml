@@ -809,17 +809,17 @@ let gi_event p f (tag, ts) =
   let n = get_max_transition_length p in
   let ppq f i = fprintf f "q_size == %d" i in
   fprintf f "@\nif (!(%a)) { while (true); }"
-    (U.pp_list " || " ppq) (U.range (n - 1));
+    (U.pp_list " || " ppq) (U.range n);
   for i = n - 1 downto 1 do begin
     let copy_component j = fprintf f "@\nq%dl%d = q%dl%d;" i j (i-1) j in
     fprintf f "@\nq%dtag = q%dtag;" i (i - 1);
-    List.iter copy_component (U.range m)
+    List.iter copy_component (U.range mm)
   end done;
   let save_component j = fprintf f "@\nq0l%d = l%d;" j j in
   let null_component j = fprintf f "@\nq0l%d = null;" j in
   fprintf f "@\nq0tag = %d;" tag;
   List.iter save_component (U.range m);
-  List.iter null_component (U.range2 (m+1) mm);
+  List.iter null_component (U.range2 m mm);
   fprintf f "@\n++q_size;";
   let execute _ = fprintf f "@\nexecute();" in
   List.iter execute (U.range n);
@@ -897,8 +897,15 @@ let gi_execute_state_queue f p vertex q_size =
               sprintf "q%dl%d" time i
             with Not_found ->
               sprintf "r%d" v in
-          let ppt f tid = fprintf f "q%dtag == %d" time tid in
+          let ppt f (a, b) = (* all tag ids in [a,b) *)
+            assert (a < b);
+            if a + 1 = b then
+              fprintf f "q%dtag == %d" time a
+            else
+              fprintf f "%d <= q%dtag && q%dtag < %d" a time time b in
           let tags = Hashtbl.find p.pattern_tags PropAst.(l.guard.tag_guard) in
+          let tags = U.intervals tags in
+          (* XXX TODO glue tags *)
           fprintf f " && (%a)" (U.pp_list " || " ppt) tags;
           let ppg = PropAst.(function
             | Variable (v, i) ->
@@ -953,7 +960,6 @@ let gi_execute_state p f vertex =
   fprintf f   "@\nif (!(state == %d)) return;" vertex;
   fprintf f   "@\nif (false) {}";
   List.iter ppq qs;
-  fprintf f   "@\nelse { while (true); }";
   fprintf f "@]@\n}";
   List.iter (gi_execute_state_queue f p vertex) qs
 

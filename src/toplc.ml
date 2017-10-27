@@ -799,11 +799,9 @@ let gi_event p f (tag, ts) =
 (* XXX  let a_arg f (i, _) = fprintf f "l%d" i in *)
   fprintf f "@\n@[<2>public static void event_%d(%a) {"
     tag (U.pp_list ", " f_arg) ts;
-(* XXX remove
-  let hint_hack i =
+  let hint_hack i = (* Remove if Infer #717 is fixed. *)
     fprintf f "@\nif (r%d != null) r%d.hashCode();" i i in
   List.iter hint_hack (get_registers p);
-*)
   let mm = get_max_arity p in
   let m = List.length ts in (* XXX check! *)
   let n = get_max_transition_length p in

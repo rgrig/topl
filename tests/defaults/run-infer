@@ -2,8 +2,10 @@
 rm -rf infer-out-topl-off infer-out-topl-on infer-out topl-off.out topl-on.out topl-issues.txt
 mkdir -p outdir
 infer --results-dir infer-out-topl-off --developer-mode -- java Main.java -d outdir > topl-off.out 2>&1
-infer --results-dir infer-out-topl-on -g --symops-per-iteration 11000 --seconds-per-iteration 100 --java-jar-compiler $TOPL_DIR/classes/toplc.jar -- java Main.java -d outdir prop.topl Config.java.topl > topl-on.out 2>&1
-#infer --results-dir infer-out-topl-on --developer-mode --symops-per-iteration 11000 --seconds-per-iteration 100 --java-jar-compiler $TOPL_DIR/classes/toplc.jar -- java Main.java -d outdir prop.topl Config.java.topl > topl-on.out 2>&1
+infer --results-dir infer-out-topl-on -g --symops-per-iteration 110000 --seconds-per-iteration 1000 --java-jar-compiler $TOPL_DIR/classes/toplc.jar -- java Main.java -d outdir prop.topl Config.java.topl > topl-on.out 2>&1
+#infer --results-dir infer-out-topl-on -g --java-jar-compiler $TOPL_DIR/classes/toplc.jar -- java Main.java -d outdir prop.topl Config.java.topl > topl-on.out 2>&1
+#infer --results-dir infer-out-topl-on --developer-mode --symops-per-iteration 110000 --seconds-per-iteration 100 --java-jar-compiler $TOPL_DIR/classes/toplc.jar -- java Main.java -d outdir prop.topl Config.java.topl > topl-on.out 2>&1
+#infer --results-dir infer-out-topl-on --developer-mode --java-jar-compiler $TOPL_DIR/classes/toplc.jar -- java Main.java -d outdir prop.topl Config.java.topl > topl-on.out 2>&1
 infer reportdiff --report-current infer-out-topl-on/report.json --report-previous infer-out-topl-off/report.json
 infer report --from-json-report infer-out/differential/introduced.json --issues-txt topl-issues.txt
 cat topl-issues.txt

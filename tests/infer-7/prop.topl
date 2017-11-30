@@ -1,0 +1,7 @@
+property ABC
+  observe <C.*>
+  prefix <C>
+  start -> start: *
+  start -> a: X.a()
+  a -> b:     x.b()
+  b -> error: x.c()

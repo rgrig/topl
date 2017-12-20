@@ -112,6 +112,8 @@ public class Compile {
         "-s", "-i", inDirPath.toString(), "-o", outDirPath.toString()));
       toplcCommand.addAll(toplProperties);
       ProcessBuilder toplcBuilder = new ProcessBuilder(toplcCommand);
+      toplcBuilder.redirectOutput(ProcessBuilder.Redirect.INHERIT);
+      toplcBuilder.redirectError(ProcessBuilder.Redirect.INHERIT);
       Process toplc = toplcBuilder.start();
       int result = toplc.waitFor();
       if (result != 0) failedCommand(result, toplcCommand);

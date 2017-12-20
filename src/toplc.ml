@@ -366,6 +366,28 @@ let init = utf8_for_method "<init>"
 let property = utf8_for_class "topl.Property"
 let check = utf8_for_method "check"
 
+type tagger =
+(*   automaton -> *)
+  PA.event_type (* call/ret *)
+  -> string list * int (* overrides *)
+  -> string (* method name *)
+  -> (int * BD.non_void_java_type) list (* event data: (index, type) pairs *)
+  -> int option (* new tag, possibly *)
+type 'hierarchy instrumentation_environment =
+  { ie_property : automaton
+  ; ie_mcall_of_interest : BH.constant_methodref -> bool
+  ; ie_get_tag : tagger
+  ; ie_hierarchy : 'hierarchy }
+
+let get_registers p =
+  let module S = U.IntSet in (* set of registers/variables *)
+  let gr_oa rs (r, _) = S.add r rs in
+  let gr_a rs xs = List.fold_left gr_oa rs xs in
+  let gr_l rs l = gr_a rs PropAst.(l.action) in
+  let gr_t rs t = List.fold_left gr_l rs t.steps in
+  let gr_vd rs v = List.fold_left gr_t rs v.outgoing_transitions in
+  S.elements (Array.fold_left gr_vd S.empty p.vertices)
+
 (* helpers for handling bytecode of methods *) (* {{{ *)
 let bm_parameters c =
   let rec tag_from k = function
@@ -383,9 +405,11 @@ let bm_return c = function
   | BH.InitMethod _ -> `Class c
   | BH.ClinitMethod _ -> `Void
 
+let string_of_method_name m =
+  B.Utils.UTF8.to_string (B.Name.utf8_for_method m)
+
 let bm_name = function
-  | BH.RegularMethod r ->
-      B.Utils.UTF8.to_string (B.Name.utf8_for_method r.BH.rm_name)
+  | BH.RegularMethod r -> string_of_method_name r.BH.rm_name
   | BH.InitMethod _ -> "<init>"
   | BH.ClinitMethod _ -> "<clinit>"
 
@@ -417,7 +441,6 @@ let bm_map_attributes f = function
       BH.ClinitMethod { i with BH.cm_attributes = f i.BH.cm_attributes }
 
 (* }}} *)
-
 (* bytecode generating helpers *) (* {{{ *)
 let bc_ldc_int i =
   [ BH.LDC (`Int (Int32.of_int i)) ]
@@ -547,7 +570,7 @@ let does_method_match
   let bamax = U.option true ((<=) ma) amax in
   let bt = U.option true ((=) mt) t in
   let bn = PA.pattern_matches re mn in
-  let r = bamin && bamax  && bt && bn in
+  let r = bamin && bamax && bt && bn in
   if log_mm then begin
     printf "@\n@[<2>%s " (if r then "✓" else "✗");
     printf "(%a, %s, %d)@ matches (%a, %s, [%d..%a])@ gives (%b, %b, (%b,%b))@]"
@@ -644,30 +667,120 @@ let get_overrides h c m =
   let qualify c =  mk_full_method_name c m.method_name in
   (List.map qualify ancestors, m.method_arity)
 
-let instrument_method get_tag h c m =
+let is_of_interest p h t (mcall : BH.constant_methodref) =
+  let exception No in
+  begin try
+    let c, mn, (args, _) = match mcall with `Methodref x -> x in
+    let method_name = string_of_method_name mn in
+    let method_arity = List.length args in
+    let m = {method_name; method_arity} in
+    let c = match c with `Class_or_interface c -> c | _ -> raise No in
+    let mns, ma = get_overrides h c m in
+    let fp pat acc =
+      let cm mn = does_method_match ({method_name=mn; method_arity=ma}, t) pat in
+      if List.exists cm mns then pat :: acc else acc in
+    let mo = U.hashtbl_fold_values fp p.observables [] in
+    let mp = U.hashtbl_fold_keys fp p.pattern_tags [] in
+    (mo <> [] && mp <> [])
+  with No -> false end
+
+let add_hints_needed_locals
+  env locals_count (lis : BH.labeled_instruction list)
+=
+  let next_local = ref locals_count in
+  let size_of = function (* XXX *)
+    | `Double | `Long -> 2
+    | _ -> 1 in
+  let fresh_local type_ =
+    let r = !next_local in
+    next_local := r + size_of type_;
+    r in
+  let needed = Hashtbl.create 1 in (* label -> (local_num * type) list *)
+  let one (l, instr) = BH.(match instr with
+    | INVOKEVIRTUAL mcall ->
+        if env.ie_mcall_of_interest mcall then begin
+          let _, _, (args, _) = match mcall with `Methodref x -> x in
+          let do_arg ls type_ = (fresh_local type_, type_) :: ls in
+          let ls = List.rev (List.fold_left do_arg [] args) in
+          Hashtbl.add needed l ls
+        end
+    | _ -> ()) in
+  List.iter one lis;
+  if true then begin
+    let dbg_local (local, _type) =
+      Printf.printf "\n %d" local in
+    let dbg_entry lbl ls =
+      Printf.printf "entry lbl=%Ld" lbl;
+      List.iter dbg_local ls;
+      Printf.printf "\n" in
+    Hashtbl.iter dbg_entry needed
+  end;
+  needed
+
+let add_hints_insert env places (code : BH.labeled_instruction list) =
+  let ic ((label, _) as l_instr) =
+    try
+      let to_save = Hashtbl.find places label in
+      let save_one (local, type_) = put_labels_on (bc_store local type_) in
+      let load_one (local, type_) = put_labels_on (bc_load local type_) in
+      let hint =
+        let rs = get_registers env.ie_property in
+        let add_if acc r =
+          let rname = utf8_for_field (sprintf "r%d" r) in
+          let objtype = `Class java_lang_Object in
+          (match acc with
+          | (l, _) :: _ ->
+              (BC.fresh_label (), BH.DUP)
+              :: (BC.fresh_label (), BH.GETSTATIC (`Fieldref
+                  (property, rname, objtype)))
+              :: (BC.fresh_label (), BH.IF_ACMPEQ l)
+              :: acc
+          | [] -> failwith "INTERNAL: (kexwv)") in
+        let nop = (BC.fresh_label (), BH.NOP) in
+        List.fold_left add_if [nop] rs in
+      ((List.rev to_save) >>= save_one)
+      @ hint
+      @ (to_save >>= load_one)
+      @ [l_instr]
+    with Not_found -> [l_instr] in
+  code >>= ic
+
+let add_hints_for_infer env locals_count code =
+  let ls = add_hints_needed_locals env locals_count code in
+  add_hints_insert env ls code
+
+let instrument_method env cls m =
   let method_name = bm_name m in
-  let arguments = bm_parameters c m in (* int is java bytecode local *)
+  let arguments = bm_parameters cls m in (* int is java bytecode local *)
   let topl_numbering i (_, t) = (i, t) in (* topl numbering always from 0 *)
   let arguments_topl = List.mapi topl_numbering arguments in
-  let return = bm_return c m in
+  let return = bm_return cls m in
   let return_event_types =
     if return <> `Void
     then [(0, as_nonvoid return)]
     else [] in
   let method_arity = List.length arguments in
-  let overrides = get_overrides h c {method_name; method_arity} in
-  let full_method_name = mk_full_method_name c method_name in
+  let overrides = get_overrides env.ie_hierarchy cls {method_name; method_arity} in
+  let full_method_name = mk_full_method_name cls method_name in
+  let locals_count = bm_locals_count m in
   let ic = instrument_code
     (bm_is_init m)
-    (get_tag PA.Call overrides full_method_name arguments_topl)
-    (get_tag PA.Return overrides full_method_name return_event_types)
+    (env.ie_get_tag PA.Call overrides full_method_name arguments_topl)
+    (env.ie_get_tag PA.Return overrides full_method_name return_event_types)
     arguments
     return
-    (bm_locals_count m) in
+    locals_count in
   let ia xs =
     (* NOTE: Uses, but doesn't update cv_type_of_local. *)
     let f = function
-      | `Code c -> `Code { c with BH.cv_code = ic c.BH.cv_code }
+      | `Code c ->
+          let cv_code = BH.(c.cv_code) in
+          let cv_code =
+            if !using_infer then
+              add_hints_for_infer env locals_count cv_code
+            else cv_code in
+          let cv_code = ic cv_code in
+          `Code { c with BH.cv_code = cv_code }
       | a -> a in
     List.map f xs in
   bm_map_attributes ia m
@@ -676,10 +789,10 @@ let pp_class f c =
   let n = B.Name.internal_utf8_for_class c.BH.c_name in
   fprintf f "@[%s@]" (B.Utils.UTF8.to_string n)
 
-let instrument_class get_tag h c =
+let instrument_class env c =
   if log_cp then printf "@\n@[<2>begin instrument %a" pp_class c;
   let instrumented_methods =
-    List.map (instrument_method get_tag h c.BH.c_name) c.BH.c_methods in
+    List.map (instrument_method env c.BH.c_name) c.BH.c_methods in
   if log_cp then printf "@]@\nend instrument %a@\n" pp_class c;
   {c with BH.c_methods = instrumented_methods}
 
@@ -695,15 +808,6 @@ let compute_inheritance in_dir =
 
 (* }}} *)
 (* generate static monitor *) (* {{{ *)
-
-let get_registers p =
-  let module S = U.IntSet in (* set of registers/variables *)
-  let gr_oa rs (r, _) = S.add r rs in
-  let gr_a rs xs = List.fold_left gr_oa rs xs in
-  let gr_l rs l = gr_a rs PropAst.(l.action) in
-  let gr_t rs t = List.fold_left gr_l rs t.steps in
-  let gr_vd rs v = List.fold_left gr_t rs v.outgoing_transitions in
-  S.elements (Array.fold_left gr_vd S.empty p.vertices)
 
 let guards_of_tag_cache = Hashtbl.create 1
 let guards_of_tag p =
@@ -729,7 +833,7 @@ let gi_configuration f p =
   let registers = get_registers p in
   let declare_register i =
     (* TODO: Check if we need to specialize to bool, int, String.*)
-    fprintf f "@\nstatic private Object r%d;" i in
+    fprintf f "@\nstatic public Object r%d;" i in
   let init_register i =
     fprintf f "@\nr%d = null;" i in
   fprintf f "@\nstatic private int state;";
@@ -796,7 +900,6 @@ let warn_if_array =
 
 let gi_event p f (tag, ts) =
   let f_arg f (i, t) = warn_if_array t; fprintf f "Object l%d" i in
-(* XXX  let a_arg f (i, _) = fprintf f "l%d" i in *)
   fprintf f "@\n@[<2>public static void event_%d(%a) {"
     tag (U.pp_list ", " f_arg) ts;
   let hint_hack i = (* Remove if Infer #717 is fixed. *)
@@ -863,17 +966,17 @@ let gi_action f actions =
   List.iter one_action actions
 
 let gi_event_state p f ((tag, ts), vertex) =
-  let is_error x =
-    p.vertices.(x).vertex_name = "error" in
+(* XXX  let is_error x =
+    p.vertices.(x).vertex_name = "error" in *)
   let transitions = transitions_of_tag_vertex p tag vertex in
   let gi_maybe_transition b (condition, action, target) =
     let gi_maybe f b =
       if b then fprintf f "maybe() && " in
     fprintf f "@]@\n@[<2>} else if (%a%a) {" gi_maybe b gi_condition condition;
     fprintf f   "%a" gi_action action;
-    fprintf f   "@\nstate = %d;" target;
-    if is_error target then
-      fprintf f "@\nwhile (true);"
+    fprintf f   "@\nstate = %d;" target
+(* XXX    if is_error target then
+      fprintf f "@\nwhile (true);" *)
   in
   let f_arg f (i, t) = warn_if_array t; fprintf f "Object l%d" i in
   fprintf f "@\n@[<2>static void event_%d_state_%d(%a) {"
@@ -926,14 +1029,14 @@ let gi_execute_state_queue f p vertex q_size =
           loop (time - 1) ls in
     loop (q_size - 1) steps in
   let gi_maybe_transition maybe t =
-    let is_error x =
-      p.vertices.(x).vertex_name = "error" in
+    (*XXX let is_error x =
+      p.vertices.(x).vertex_name = "error" in *)
     let m = if maybe then "maybe()" else "true" in
     fprintf f "else if (%s%a) {" m gi_condition t.steps;
     fprintf f   "%a" gi_action t.steps;
     fprintf f   "@\nstate = %d;" t.target;
     fprintf f   "@\nq_size -= %d;" (List.length t.steps);
-    if is_error t.target then fprintf f "@\nwhile (true);";
+(*     if is_error t.target then fprintf f "@\nwhile (true);"; *)
     fprintf f "@]@\n@[<2>} " in
   let transitions = p.vertices.(vertex).outgoing_transitions in
   fprintf f "@\n@[<2>static void execute_state%d_q%d() {" vertex q_size;
@@ -1047,7 +1150,12 @@ let () =
     let ps = read_properties !fs in
     let h = compute_inheritance in_dir in
     let p = transform_properties ps in
-    ClassMapper.map in_dir out_dir (instrument_class (get_tag p) h);
+    let env =
+      { ie_property = p
+      ; ie_mcall_of_interest = is_of_interest p h PA.Call
+      ; ie_get_tag = get_tag p
+      ; ie_hierarchy = h } in
+    ClassMapper.map in_dir out_dir (instrument_class env);
     !generate_checkers out_dir !extra_fs p;
     printf "@."
   with

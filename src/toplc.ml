@@ -1001,13 +1001,13 @@ let gi_execute_state_queue f p vertex q_size =
           let ppt f (a, b) = (* all tag ids in [a,b) *)
             assert (a < b);
             if a + 1 = b then
-              fprintf f "q%dtag == %d" time a
+              fprintf f " || q%dtag == %d" time a
             else
-              fprintf f "%d <= q%dtag && q%dtag < %d" a time time b in
+              fprintf f " || %d <= q%dtag && q%dtag < %d" a time time b in
           let tags = Hashtbl.find p.pattern_tags PropAst.(l.guard.tag_guard) in
-          let tags = U.intervals tags in
+          let tags = Util.intervals tags in
           (* XXX TODO glue tags *)
-          fprintf f " && (%a)" (U.pp_list " || " ppt) tags;
+          fprintf f " && (false%a)" (Util.pp_list "" ppt) tags;
           let ppg = PropAst.(function
             | Variable (v, i) ->
                 fprintf f " && %s == q%dl%d" (reg v) time i

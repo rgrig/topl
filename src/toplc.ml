@@ -842,7 +842,8 @@ let gi_configuration f p =
   let maybe_state n =
     fprintf f   "@\nif (maybe()) state = %d;" n in
   let init_state = function
-    | [] -> failwith "INTERNAL: vbkzpgbiuf"
+    (* FIXME: no property leads to no initial state, which fails below *)
+    | [] -> failwith "INTERNAL: vbkzpgbiuf" 
     | x :: xs -> fprintf f "@\nstate = %d;" x; List.iter maybe_state xs in
   init_state (starts p);
   List.iter init_register registers;

@@ -1067,6 +1067,7 @@ let gi_execute_state p f vertex =
 
 let gi_execute f p =
   fprintf f "@\n@[<2>static void execute() {";
+  fprintf f "@\nif (q_size == 0) { while (true); } ";
   let gn i = p.vertices.(i).vertex_name in
   let pe i = fprintf f "@\nexecute_state%d(); // %s" i (gn i) in
   List.iter pe (all_vertices p);

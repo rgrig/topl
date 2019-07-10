@@ -9,3 +9,10 @@
 /TODO
 /work.tmp
 javac.err.topl
+*.err
+*.out
+/out
+/temp
+tests/*/err
+tests/*/out
+src/trash

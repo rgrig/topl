@@ -7,8 +7,8 @@ module B = BaristaLibrary
 module BC = BaristaLibrary.Coder
 module BD = BaristaLibrary.Descriptor
 module BH = BaristaLibrary.HighTypes
-module BU = BaristaLibrary.Utils
 module BN = BaristaLibrary.Name
+module BU = BaristaLibrary.Utils
 module PA = PropAst
 module U = Util
 
@@ -656,10 +656,7 @@ let get_overrides h c m =
   let qualify c =  mk_full_method_name c m.method_name in
   (List.map qualify ancestors, m.method_arity)
 
-let rec pp_for_parameter_list = function
-  | [] -> ""
-  | p :: [] -> B.Utils.UTF8.to_string(BD.utf8_of_parameter(p))
-  | p :: ps -> B.Utils.UTF8.to_string(BD.utf8_of_parameter(p)) ^ pp_for_parameter_list(ps)
+let pp_parameter f p  = Format.fprintf f "%s" (B.Utils.UTF8.to_string(BD.utf8_of_parameter(p)))
 
 let if_ b xs = if b then List.concat xs else []
 
@@ -669,8 +666,8 @@ let instrument_call locals parameters call_id instrs =
   let rev_params = List.rev parameters in
   let max = locals + List.length parameters in
   let instrumentation =
-    if log_in then printf "Call Instrumented with call ID: %a, Locals: %i, Max: %i, Parameter List: %s\n"
-                   (U.pp_option U.pp_int) call_id locals max (pp_for_parameter_list parameters); 
+    if log_in then printf "Call Instrumented with call ID: %a, Locals: %i, Max: %i, Parameter List: %a\n"
+                   (U.pp_option U.pp_int) call_id locals max (Format.pp_print_list pp_parameter) parameters; 
   List.concat
   [ 
       List.concat (List.mapi (fun i param -> bc_store (max - i) param) rev_params )
@@ -705,11 +702,6 @@ let instrument_invoke method_name class_name parameters return env locals instr 
        else [] in
      let call_id = (env.ie_get_tag PA.Call overrides full_method_name arguments_topl) in
      let return_id = (env.ie_get_tag PA.Return overrides full_method_name return_event_types) in
-     (*let class_type =
-       if virtual_call
-       then [`Class class_name]
-       else [] in
-     let parameters = class_type @ parameters in*)
      if log_in then printf "\nInvoke Call %s.%s a:%a b:%a\n" (string_of_class_name class_name ) (method_name)
                     (U.pp_option U.pp_int) call_id (U.pp_option U.pp_int) return_id ;
      instrument_call locals parameters call_id (instrument_return locals return return_id [instr] )
@@ -726,7 +718,7 @@ let instrument_instruction env locals = function
      instrument_invoke m c parameters return env locals instr
   | (l, BH.NEW c) as instr ->
      if log_in then printf "\n%Li: New call for Class %s" l (string_of_class_name c) ;
-     [instr]
+     [instr] (* No instrumentation here as the instrumentation occurs at the following INVOKESPECIAL, however debug message may be useful to highlight the relevent NEW. *)
   | (l, BH.INVOKESPECIAL(`Methodref (`Class_or_interface c,m,(parameters,return)))) as instr ->
      if log_in then printf "\n%Li: InvokeSpecial call for %s.%s\n"
                     l (string_of_class_name c) (string_of_method_name m) ;

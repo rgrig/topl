@@ -579,10 +579,10 @@ let does_method_match
     printf "@\n@[<2>%s " (if r then "✓" else "✗");
     printf "(%a, %s, %d)@ matches (%a, %s, [%d..%a])@ gives (%b, %b, (%b,%b))@]"
       PA.pp_event_type mt mn ma
-      (U.pp_option PA.pp_event_type) t
+      (Format.pp_print_option PA.pp_event_type) t
       re.PA.p_string
       amin
-      (U.pp_option U.pp_int) amax
+      (Format.pp_print_option Format.pp_print_int) amax
       bt bn bamin bamax
   end;
   r
@@ -667,7 +667,7 @@ let instrument_call locals parameters call_id instrs =
   let max = locals + List.length parameters in
   let instrumentation =
     if log_in then printf "Call Instrumented with call ID: %a, Locals: %i, Max: %i, Parameter List: %a\n"
-                   (U.pp_option U.pp_int) call_id locals max (Format.pp_print_list pp_parameter) parameters; 
+                   (Format.pp_print_option Format.pp_print_int) call_id locals max (Format.pp_print_list pp_parameter) parameters; 
   List.concat
   [ 
       List.concat (List.mapi (fun i param -> bc_store (max - i) param) rev_params )
@@ -679,7 +679,7 @@ let instrument_call locals parameters call_id instrs =
 let instrument_return locals return return_id instrs =
   let instrumentation =
     if log_in then printf "Return Instrumented with return ID: %a\n"
-                          (U.pp_option U.pp_int) return_id ;
+                          (Format.pp_print_option Format.pp_print_int) return_id ;
   if_ (has return_id)
       [ if_ (return <> `Void)
       [ bc_dup return
@@ -703,7 +703,7 @@ let instrument_invoke method_name class_name parameters return env locals instr 
      let call_id = (env.ie_get_tag PA.Call overrides full_method_name arguments_topl) in
      let return_id = (env.ie_get_tag PA.Return overrides full_method_name return_event_types) in
      if log_in then printf "\nInvoke Call %s.%s a:%a b:%a\n" (string_of_class_name class_name ) (method_name)
-                    (U.pp_option U.pp_int) call_id (U.pp_option U.pp_int) return_id ;
+                    (Format.pp_print_option Format.pp_print_int) call_id (Format.pp_print_option Format.pp_print_int) return_id ;
      instrument_call locals parameters call_id (instrument_return locals return return_id [instr] )
                                                              
 let instrument_instruction env locals = function
@@ -811,7 +811,7 @@ let add_hints_for_infer env locals_count code =
   let ls = add_hints_needed_locals env locals_count code in
   add_hints_insert env ls code
 
-let instrument_method env cls m =
+let instrument_method env m =
   let locals_count = bm_locals_count m in
   let ic = instrument_code env locals_count in
   let ia xs =
@@ -836,7 +836,7 @@ let pp_class f c =
 let instrument_class env c =
   if log_cp then printf "@\n@[<2>begin instrument %a" pp_class c;
   let instrumented_methods =
-    List.map (instrument_method env c.BH.c_name) c.BH.c_methods in
+    List.map (instrument_method env ) c.BH.c_methods in
   if log_cp then printf "@]@\nend instrument %a@\n" pp_class c;
   {c with BH.c_methods = instrumented_methods}
 

@@ -670,9 +670,9 @@ let instrument_call locals parameters call_id instrs =
                    (Format.pp_print_option Format.pp_print_int) call_id locals max (Format.pp_print_list pp_parameter) parameters; 
   List.concat
   [ 
-      List.concat (List.mapi (fun i param -> bc_store (max - i) param) rev_params )
-    ; List.concat (List.mapi (fun i param -> bc_load (locals + 1 + i) param) parameters)
-    ; bc_emit call_id (tag_from (locals+1) parameters) ] in
+      List.concat (List.mapi (fun i param -> bc_store (max-1 - i) param) rev_params ) (* The last used local is actually locals -1, therefore this is mirrord in max which goes unused. *)
+    ; List.concat (List.mapi (fun i param -> bc_load (locals + i) param) parameters)
+    ; bc_emit call_id (tag_from (locals) parameters) ] in
   let instrumentation = put_labels_on instrumentation in
   instrumentation @ instrs
 

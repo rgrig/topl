@@ -7,6 +7,7 @@ module B = BaristaLibrary
 module BC = BaristaLibrary.Coder
 module BD = BaristaLibrary.Descriptor
 module BH = BaristaLibrary.HighTypes
+module BN = BaristaLibrary.Name
 module BU = BaristaLibrary.Utils
 module PA = PropAst
 module U = Util
@@ -389,11 +390,11 @@ let get_registers p =
   S.elements (Array.fold_left gr_vd S.empty p.vertices)
 
 (* helpers for handling bytecode of methods *) (* {{{ *)
-let bm_parameters c =
-  let rec tag_from k = function
+let rec tag_from k = function
     | [] -> []
-    | x :: xs -> (k, x) :: tag_from (succ k) xs in
-  function
+    | x :: xs -> (k, x) :: tag_from (succ k) xs
+               
+let bm_parameters c = function
     | BH.RegularMethod m -> tag_from 0
         ((if List.mem `Static m.BH.rm_flags then [] else [`Class c])
         @ fst m.BH.rm_descriptor)
@@ -405,6 +406,9 @@ let bm_return c = function
   | BH.InitMethod _ -> `Class c
   | BH.ClinitMethod _ -> `Void
 
+let string_of_class_name c =
+  B.Utils.UTF8.to_string (B.Name.printable_utf8_for_class c)
+  
 let string_of_method_name m =
   B.Utils.UTF8.to_string (B.Name.utf8_for_method m)
 
@@ -575,10 +579,10 @@ let does_method_match
     printf "@\n@[<2>%s " (if r then "✓" else "✗");
     printf "(%a, %s, %d)@ matches (%a, %s, [%d..%a])@ gives (%b, %b, (%b,%b))@]"
       PA.pp_event_type mt mn ma
-      (U.pp_option PA.pp_event_type) t
+      (Format.pp_print_option PA.pp_event_type) t
       re.PA.p_string
       amin
-      (U.pp_option U.pp_int) amax
+      (Format.pp_print_option Format.pp_print_int) amax
       bt bn bamin bamax
   end;
   r
@@ -630,20 +634,11 @@ let bc_at_return =
 let bc_at_call xs lys =
   put_labels_on xs @ lys
 
-let instrument_code is_init call_id return_id arguments return locals code =
-  let if_ b xs = if b then List.concat xs else [] in
-  let has = (<>) None in
-  let instrument_call = bc_at_call (List.concat
-    [ if_ (is_init && has return_id)
-      [ bc_load 0 return
-      ; bc_store locals return ]
-    ; bc_emit call_id arguments ]) in
-  let instrument_return = bc_at_return (if_ (has return_id)
-    [ if_ (not is_init && return <> `Void)
-      [ bc_dup return
-      ; bc_store locals return ]
-    ; bc_emit return_id (if_ (return <> `Void) [[(locals, return)]]) ]) in
-  instrument_call (instrument_return code)
+let name_of_class c =
+  B.Utils.UTF8.to_string (B.Name.external_utf8_for_class c)
+
+let mk_full_method_name c mn =
+  name_of_class c ^ "." ^ mn
 
 let get_ancestors h c =
   let cs = Hashtbl.create 0 in
@@ -656,16 +651,83 @@ let get_ancestors h c =
   ga c;
   U.hashtbl_fold_keys (fun c cs -> c :: cs) cs []
 
-let name_of_class c =
-  B.Utils.UTF8.to_string (B.Name.external_utf8_for_class c)
-
-let mk_full_method_name c mn =
-  name_of_class c ^ "." ^ mn
-
 let get_overrides h c m =
   let ancestors = get_ancestors h c in
   let qualify c =  mk_full_method_name c m.method_name in
   (List.map qualify ancestors, m.method_arity)
+
+let pp_parameter f p  = Format.fprintf f "%s" (B.Utils.UTF8.to_string(BD.utf8_of_parameter(p)))
+
+let if_ b xs = if b then List.concat xs else []
+
+let has = (<>) None
+        
+let instrument_call locals parameters call_id instrs =
+  let rev_params = List.rev parameters in
+  let max = locals + List.length parameters in
+  let instrumentation =
+    if log_in then printf "Call Instrumented with call ID: %a, Locals: %i, Max: %i, Parameter List: %a\n"
+                   (Format.pp_print_option Format.pp_print_int) call_id locals max (Format.pp_print_list pp_parameter) parameters; 
+  List.concat
+  [ 
+      List.concat (List.mapi (fun i param -> bc_store (max-1 - i) param) rev_params ) (* The last used local is actually locals -1, therefore this is mirrord in max which goes unused. *)
+    ; List.concat (List.mapi (fun i param -> bc_load (locals + i) param) parameters)
+    ; bc_emit call_id (tag_from (locals) parameters) ] in
+  let instrumentation = put_labels_on instrumentation in
+  instrumentation @ instrs
+
+let instrument_return locals return return_id instrs =
+  let instrumentation =
+    if log_in then printf "Return Instrumented with return ID: %a\n"
+                          (Format.pp_print_option Format.pp_print_int) return_id ;
+  if_ (has return_id)
+      [ if_ (return <> `Void)
+      [ bc_dup return
+      ; bc_store locals return ]
+    ; bc_emit return_id (if_ (return <> `Void) [[(locals, return)]]) ]
+  in
+  let instrumentation = put_labels_on instrumentation in
+  instrs @ instrumentation
+
+let instrument_invoke method_name class_name parameters return env locals instr =
+     let method_name = string_of_method_name method_name in
+     let full_method_name = mk_full_method_name class_name method_name in
+     let method_arity = List.length parameters in
+     let overrides = get_overrides env.ie_hierarchy class_name {method_name; method_arity} in
+     let topl_numbering i t = (i, t) in (* topl numbering always from 0 *)
+     let arguments_topl = List.mapi topl_numbering parameters in
+     let return_event_types =
+       if return <> `Void
+       then [(0, as_nonvoid return)]
+       else [] in
+     let call_id = (env.ie_get_tag PA.Call overrides full_method_name arguments_topl) in
+     let return_id = (env.ie_get_tag PA.Return overrides full_method_name return_event_types) in
+     if log_in then printf "\nInvoke Call %s.%s a:%a b:%a\n" (string_of_class_name class_name ) (method_name)
+                    (Format.pp_print_option Format.pp_print_int) call_id (Format.pp_print_option Format.pp_print_int) return_id ;
+     instrument_call locals parameters call_id (instrument_return locals return return_id [instr] )
+                                                             
+let instrument_instruction env locals = function
+  | ( l , BH.INVOKEVIRTUAL (`Methodref ((`Class_or_interface c),m,(parameters,return))) ) as instr ->
+     let parameters = [`Class c] @ parameters in
+     if log_in then printf "\n%Li: InvokeVirtual Call %s.%s \n"
+                    l (string_of_class_name c) (string_of_method_name m) ;
+     instrument_invoke m c parameters return env locals instr
+  | (l, BH.INVOKESTATIC `Methodref((`Class_or_interface c),m,(parameters,return))) as instr ->
+     if log_in then printf "\n%Li: InvokeStatic Call %s.%s \n"
+                    l (string_of_class_name c) (string_of_method_name m) ;
+     instrument_invoke m c parameters return env locals instr
+  | (l, BH.NEW c) as instr ->
+     if log_in then printf "\n%Li: New call for Class %s" l (string_of_class_name c) ;
+     [instr] (* No instrumentation here as the instrumentation occurs at the following INVOKESPECIAL, however debug message may be useful to highlight the relevent NEW. *)
+  | (l, BH.INVOKESPECIAL(`Methodref (`Class_or_interface c,m,(parameters,return)))) as instr ->
+     if log_in then printf "\n%Li: InvokeSpecial call for %s.%s\n"
+                    l (string_of_class_name c) (string_of_method_name m) ;
+     instrument_invoke m c parameters return env locals instr
+  | instr -> [instr]
+  
+  
+let instrument_code env locals code =
+  List.concat ( List.map (instrument_instruction env locals) code )
 
 let is_of_interest p h t (mcall : BH.constant_methodref) =
   let exception No in
@@ -749,27 +811,9 @@ let add_hints_for_infer env locals_count code =
   let ls = add_hints_needed_locals env locals_count code in
   add_hints_insert env ls code
 
-let instrument_method env cls m =
-  let method_name = bm_name m in
-  let arguments = bm_parameters cls m in (* int is java bytecode local *)
-  let topl_numbering i (_, t) = (i, t) in (* topl numbering always from 0 *)
-  let arguments_topl = List.mapi topl_numbering arguments in
-  let return = bm_return cls m in
-  let return_event_types =
-    if return <> `Void
-    then [(0, as_nonvoid return)]
-    else [] in
-  let method_arity = List.length arguments in
-  let overrides = get_overrides env.ie_hierarchy cls {method_name; method_arity} in
-  let full_method_name = mk_full_method_name cls method_name in
+let instrument_method env m =
   let locals_count = bm_locals_count m in
-  let ic = instrument_code
-    (bm_is_init m)
-    (env.ie_get_tag PA.Call overrides full_method_name arguments_topl)
-    (env.ie_get_tag PA.Return overrides full_method_name return_event_types)
-    arguments
-    return
-    locals_count in
+  let ic = instrument_code env locals_count in
   let ia xs =
     (* NOTE: Uses, but doesn't update cv_type_of_local. *)
     let f = function
@@ -792,7 +836,7 @@ let pp_class f c =
 let instrument_class env c =
   if log_cp then printf "@\n@[<2>begin instrument %a" pp_class c;
   let instrumented_methods =
-    List.map (instrument_method env c.BH.c_name) c.BH.c_methods in
+    List.map (instrument_method env ) c.BH.c_methods in
   if log_cp then printf "@]@\nend instrument %a@\n" pp_class c;
   {c with BH.c_methods = instrumented_methods}
 

@@ -17,10 +17,12 @@ type pattern =
 type ('variable, 'value) value_guard =
   | Variable of 'variable * int
   | Constant of 'value * int
-
+  | Argument of int * int
+              
 type event_type =
   | Call
   | Return
+  | Both
 
 type ('event_type, 'method_name, 'method_arity) tag =
   { event_type : 'event_type
@@ -45,7 +47,9 @@ let check_event_guard g =
   let amin, amax = g.tag_guard.method_arity in
   U.option () (fun amax -> assert (amin <= amax)) amax;
   let chk = function
-    | Variable (_, m) | Constant (_, m) -> assert (m < amin) in
+    | Variable (_, m) | Constant (_, m) -> assert (m <= amin)
+    | Argument (l,m) -> assert ( m < amin && l < amin) 
+  in
   List.iter chk g.value_guards
 
 type 'variable action = ('variable * int) list
@@ -99,6 +103,7 @@ let outgoing a src =
 let pp_event_type f = function
   | Call -> fprintf f "call"
   | Return -> fprintf f "return"
+  | Both -> fprintf f "call&return"
 
 (* TODO(rgrig): remove? *)
 let ok_automaton =

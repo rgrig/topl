@@ -155,7 +155,8 @@ let pp_array pe f x = pp_list pe f (Array.to_list x)
 let pp_value_guard index f = function
   | PA.Variable (v, i) -> fprintf f "0 %d %d" i v
   | PA.Constant (c, i) -> fprintf f "1 %d %a" i (pp_constant_as_int index) c
-
+  | PA.Argument (a, b) -> fprintf f "2 %d %d" a b
+    
 let pp_pattern tags f p =
   fprintf f "%a" (pp_list pp_int) (Hashtbl.find tags p)
 
@@ -303,7 +304,8 @@ let transform_tag_guard ptags tg =
 let transform_value_guard ifv = function
   | PA.Variable (v, i) -> PA.Variable (index_for_var ifv v, i)
   | PA.Constant (c, i) -> PA.Constant (c, i)
-
+  | PA.Argument (a, b) -> PA.Argument (a, b)
+                        
 let transform_guard ifv ptags {PA.tag_guard=tg; PA.value_guards=vgs} =
   { PA.tag_guard = transform_tag_guard ptags tg
   ; PA.value_guards = List.map (transform_value_guard ifv) vgs }
@@ -505,6 +507,9 @@ let bc_store i = function
 let bc_dup t =
   [ if BD.size t = 2 then BH.DUP2 else BH.DUP ]
 
+let void_return i =
+  [BH.ACONST_NULL; BH.ASTORE i]
+
 let as_nonvoid = function
   | #BD.non_void_java_type as t -> t
   | _ -> failwith "INTERNAL(owwqr): expecting non-void"
@@ -689,22 +694,69 @@ let instrument_return locals return return_id instrs =
   let instrumentation = put_labels_on instrumentation in
   instrs @ instrumentation
 
+let instrument_both class_name locals parameters return both_id instrs =
+    let rev_params = List.rev parameters in
+    let max = locals + List.length parameters in
+    let instrumentation_before =
+         if log_in then printf "Call and Return Instrumented with call&return ID: %a, Locals: %i, Max: %i, Parameter List: %a\n"
+                               (Format.pp_print_option Format.pp_print_int) both_id locals max (Format.pp_print_list pp_parameter) parameters;
+         List.concat
+           [
+             List.concat (List.mapi (fun i param -> bc_store (max-1 - i) param) rev_params)
+           ; List.concat (List.mapi (fun i param -> bc_load (locals + i) param) parameters)
+           ; List.concat (List.mapi (fun i param -> bc_load (locals + i) param) parameters)
+           ]
+    in
+    let return_instrumentation =
+        List.concat [
+            if return <> `Void then bc_store locals return else void_return locals
+          ; List.concat (List.mapi (fun i param -> bc_store(max-i) param) rev_params)
+          ; bc_load locals (if return <> `Void then return else `Class class_name)
+          ]
+    in
+    let instrumentation_after =
+      List.concat
+        [
+          return_instrumentation
+          ; let params = tag_from (locals+1) parameters in
+            let args = (match return with
+                        | `Void -> [(locals, `Class class_name )] @ params
+                        | #BD.non_void_java_type as x -> [(locals, x)] @ params) in
+            bc_emit both_id args
+            ;]
+    in
+    let instrumentation_before = put_labels_on instrumentation_before in
+    let instrumentation_after = put_labels_on instrumentation_after in
+    instrumentation_before @ instrs @ instrumentation_after
+  
+
 let instrument_invoke method_name class_name parameters return env locals instr =
      let method_name = string_of_method_name method_name in
      let full_method_name = mk_full_method_name class_name method_name in
      let method_arity = List.length parameters in
      let overrides = get_overrides env.ie_hierarchy class_name {method_name; method_arity} in
-     let topl_numbering i t = (i, t) in (* topl numbering always from 0 *)
-     let arguments_topl = List.mapi topl_numbering parameters in
+     (*let topl_numbering i t = (i, t) in (* topl numbering always from 0 *)
+     let arguments_topl = List.mapi topl_numbering parameters in*)
      let return_event_types =
        if return <> `Void
        then [(0, as_nonvoid return)]
        else [] in
-     let call_id = (env.ie_get_tag PA.Call overrides full_method_name arguments_topl) in
-     let return_id = (env.ie_get_tag PA.Return overrides full_method_name return_event_types) in
+     (*let call_id = (env.ie_get_tag PA.Call overrides full_method_name arguments_topl) in
+     let return_id = (env.ie_get_tag PA.Return overrides full_method_name return_event_types) in *)
+     let both_id =  (env.ie_get_tag PA.Both overrides full_method_name return_event_types) in
+     if log_in then printf "\nInvoke Call %s.%s a:%a\n" (string_of_class_name class_name ) (method_name) (Format.pp_print_option Format.pp_print_int) both_id ;
+     match both_id with
+     | Some _ -> instrument_both class_name locals parameters return both_id [instr]
+     | None -> [instr]
+
+     (*
      if log_in then printf "\nInvoke Call %s.%s a:%a b:%a\n" (string_of_class_name class_name ) (method_name)
-                    (Format.pp_print_option Format.pp_print_int) call_id (Format.pp_print_option Format.pp_print_int) return_id ;
-     instrument_call locals parameters call_id (instrument_return locals return return_id [instr] )
+                      (Format.pp_print_option Format.pp_print_int) call_id (Format.pp_print_option Format.pp_print_int) return_id ;
+     match (call_id, return_id) with
+     | (Some _, Some _) -> instrument_both locals parameters return both_id [instr]
+     | (Some _, None) -> instrument_call locals parameters call_id [instr]
+     | (None, Some _) -> instrument_return locals return return_id [instr]
+     | (None, None) -> [instr]*)
                                                              
 let instrument_instruction env locals = function
   | ( l , BH.INVOKEVIRTUAL (`Methodref ((`Class_or_interface c),m,(parameters,return))) ) as instr ->
@@ -911,7 +963,9 @@ let get_max_arity p =
   let open PropAst in
   let a z (_, x) = max z x in
   let vg z = function
-    | Variable (_, x) | Constant (_, x) -> max z x in
+    | Variable (_, x) | Constant (_, x) -> max z x
+    | Argument (a, b) -> max(max a b) z
+  in
   let l z x =
     let z = List.fold_left a z x.action in
     List.fold_left vg z x.guard.value_guards in
@@ -1001,7 +1055,8 @@ let gi_condition f conditions =
         fprintf f " && r%d == l%d" register letter
     | PA.Constant (literal, letter) ->
         (* TODO: this probably needs to use .equals() for strings *)
-        fprintf f " && %s == l%d" literal letter in
+       fprintf f " && %s == l%d" literal letter
+    | PA.Argument (letter1, letter2) -> fprintf f " && l%d == l%d" letter1 letter2 in
   fprintf f "true";
   List.iter one_condition conditions
 
@@ -1057,7 +1112,9 @@ let gi_execute_state_queue f p vertex q_size =
             | Variable (v, i) ->
                 fprintf f " && %s == q%dl%d" (reg v) time i
             | Constant (c, i) -> (* XXX use 'equals' for strings *)
-                fprintf f " && %s == q%dl%d" c time i) in
+               fprintf f " && %s == q%dl%d" c time i
+            | Argument (a, b) ->
+               fprintf f " && q%dl%d == l%d" time a b) in
           List.iter ppg PropAst.(l.guard.value_guards);
           let do_action register_map (v, i) =
             Util.IntMap.add v (time, i) register_map in

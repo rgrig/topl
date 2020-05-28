@@ -772,9 +772,9 @@ let instrument_instruction env locals = function
      if log_in then printf "\n%Li: New call for Class %s" l (string_of_class_name c) ;
      [instr] (* No instrumentation here as the instrumentation occurs at the following INVOKESPECIAL, however debug message may be useful to highlight the relevent NEW. *)
   | (l, BH.INVOKESPECIAL(`Methodref (`Class_or_interface c,m,(parameters,return)))) as instr ->
-     if log_in then printf "\n%Li: InvokeSpecial call for %s.%s\n"
-                    l (string_of_class_name c) (string_of_method_name m) ;
-     instrument_invoke m c parameters return env locals instr
+     if log_in then printf "\n%Li: InvokeSpecial call for %s.%s Return: %b\n"
+                    l (string_of_class_name c) (string_of_method_name m) (return = `Void) ;
+     instrument_invoke m c parameters (`Class c) env locals instr
   | instr -> [instr]
   
   

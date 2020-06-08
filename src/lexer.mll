@@ -20,8 +20,7 @@
   let keyword =
     let table = Hashtbl.create 53 in
     List.iter (fun (k, v) -> Hashtbl.add table k v)
-      [ "call", CALL
-      ; "message", MESSAGE
+      [ "message", MESSAGE
       ; "observe", OBSERVE
       ; "prefix", PREFIX
       ; "property", PROPERTY

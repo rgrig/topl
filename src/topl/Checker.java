@@ -867,6 +867,10 @@ public class Checker {
             }
             return store;
         }
+        
+        public String toString() {
+        	return "Action: " + assignments.entrySet();      	
+        }
     }
 
     static class TransitionStep {
@@ -884,6 +888,15 @@ public class Checker {
             return eventIds.contains(event.id)
                 && guard.evaluate(event, store);
         }
+        
+        public String toString() {
+        	String s = "EventIDs: ";
+        	for(Integer I : eventIds) {
+        		s += I +", ";
+        	}      			
+        	s +="Guard: " + guard + ", Action: " + action;
+        	return s;
+        }
     }
 
     static class Transition {
@@ -897,6 +910,16 @@ public class Checker {
 
         Transition(TransitionStep oneStep, int target) {
             this(new TransitionStep[]{oneStep}, target);
+        }
+        
+        public String toString() {
+        	String s = "Transition:";
+        	int i = 1;
+        	for(TransitionStep ts : steps) {
+        		s += "\nStep " + i++ + ": " + ts;
+        	}
+        	s += "\nTransition Target: " + target;
+        	return s;
         }
     }
 
@@ -999,6 +1022,38 @@ public class Checker {
 
         boolean isObservable(int eventId, int vertex) {
             return observable[filterOfState[vertex]][eventId];
+        }
+        
+        public String toString() {
+        	String s  = "Event Names: \n";
+        	for(int i = 0; i < eventNames.length; i++) {
+        		s += "Event " + i + ": " + eventNames[i] + "\n";
+        	}
+        	
+        	s += "\nError Messages: \n";
+        	for(int i = 0; i < errorMessages.length; i++) {
+        		s += "Error " + i + ": " + errorMessages[i] + "\n";
+        	}
+        	
+        	s += "\nFilter of State: \n";
+        	for(int i = 0; i < filterOfState.length; i++) {
+        		s += filterOfState[i] + ",";
+        	}
+        	
+        	s += "\n\nStart Verticies: \n";
+        	for(int i = 0; i < startVertices.length; i++) {
+        		s += startVertices[i] + ",";
+        	}
+        	
+        	s += "\n";
+        	
+        	for(int i = 0; i < vertexNames.length; i++) {
+        		s+= "\nVertex: " + vertexNames[i] + ", \nVertex Transitions:\n";
+        		for(Transition t : transitions[i]) {
+        			s += t + "\n";
+        		}
+        	}
+        	return s;
         }
     }
     // }}}
@@ -1381,6 +1436,9 @@ public class Checker {
         /** Returns {@code null} if something goes wrong. */
         public static Checker checker(
                 String automatonFile, String stringsFile, Object[] constants) {
+        	if(logAutomaton) {
+    	    	System.out.println("Parsing Automaton from file: " + automatonFile);
+    	    }
             try {
                 ArrayDeque<String> strings = new ArrayDeque<String>();
                 Scanner scan = new Scanner(
@@ -1414,11 +1472,18 @@ public class Checker {
                 filters[i] = ints();
             }
             String[] eventNames = strings();
-            return new Automaton(startVertices, errorMessages, transitions,
+            Automaton automaton = new Automaton(startVertices, errorMessages, transitions,
                                  filterOfState, filters, eventNames, vertexNames);
+            if(logAutomaton) {
+            	System.out.println("Automaton Description:");
+            	System.out.println(automaton.toString());
+            	System.out.println();
+            }
+            return automaton;
         }
 
         Transition[] transitions() {
+        	
             Transition[] transitions = new Transition[scan.nextInt()];
             for (int i = 0; i < transitions.length; ++i) {
                 transitions[i] = transition();
@@ -1431,6 +1496,7 @@ public class Checker {
             for (int i = 0; i < steps.length; ++i) {
                 steps[i] = step();
             }
+
             return new Transition(steps, scan.nextInt());
         }
 
@@ -1564,8 +1630,9 @@ public class Checker {
         return toDOT(0);
     }
 
+    private static boolean logAutomaton = true;
     private static boolean logGuard = false;
-    private static boolean logState = false;
+    private static boolean logState = true;
     private static boolean logTreap = false;
     // }}}
 }

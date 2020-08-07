@@ -82,11 +82,17 @@ public class QuantifierElimination {
 			equalities.add(b.variable);
 		}
 		
-		public Binding get() {
+		public Binding get(Binding binding) {
+			// We don't keep binding values up to date if they are modified via elimination or the addition 
+			// of constraints so we cannot just grab the value in variables but check the equalities.
+			Binding shadowBinding = new Binding(equalities.get(binding.variable)); 
+			for(Binding b : variables) {
+				if(shadowBinding.compareTo(b) == 0) {
+					return new Binding(binding.variable, shadowBinding.value);
+				}
+			}
 			return null;
 		}
-		
-		
 		
 		public boolean isEqual(DisJointSet set) {
 			if(this.equalities.size() != set.equalities.size() || this.disequalities.size() != set.disequalities.size()) return false;

@@ -82,6 +82,10 @@ public class QuantifierElimination {
 			equalities.add(b.variable);
 		}
 		
+		public int size() {
+			return variables.size();
+		}
+		
 		public Binding get(Binding binding) {
 			// We don't keep binding values up to date if they are modified via elimination or the addition 
 			// of constraints so we cannot just grab the value in variables but check the equalities.

@@ -1,8 +1,6 @@
 // header {{{
 package topl;
 
-import java.io.File;
-import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayDeque;
 import java.util.Arrays;
@@ -11,6 +9,8 @@ import java.util.IdentityHashMap;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.Scanner;
+
+import topl.QuantifierElimination.DisJointSet;
 // }}}
 public class Checker {
     /*  Implementation Notes {{{
@@ -136,6 +136,7 @@ public class Checker {
     }
     // }}}
     // Treap<T extends Comparable<T>> {{{
+    /*
     static class Treap<T extends Comparable<T>> implements Iterable<T> {
         static class Itr<T extends Comparable<T>> implements Iterator<T> {
             ArrayDeque<Treap<T>> stack = new ArrayDeque<Treap<T>>();
@@ -297,6 +298,8 @@ public class Checker {
         static boolean priorityLess(int p, int q) {
             return p < q || (p == q && random.nextBoolean());
         }
+    	
+    	
 
         Treap<T> remove(T oldData) {
             if (logTreap) {
@@ -391,6 +394,7 @@ public class Checker {
             return sb.toString();
         }
     }
+    */
     // }}}
     // HSet<T> {{{
     static class HSet<T> implements Iterable<T> {
@@ -659,7 +663,8 @@ public class Checker {
 
         // These contribute to the identity of a State.
         final int vertex;
-        final Treap<Binding> store;
+        //final Treap<Binding> store;
+        final DisJointSet store;
         final Queue<Event> events;
 
         // History for trace reporting. Does not affect automaton semantics,
@@ -669,7 +674,7 @@ public class Checker {
         // How many non-skip transitions were taken to build this state.
         int time;
 
-        private State(int vertex, Treap<Binding> store, Queue<Event> events,
+        private State(int vertex, DisJointSet store, Queue<Event> events,
                 Parent parent, int time, long id) {
             this.vertex = vertex;
             this.store = store;
@@ -693,11 +698,12 @@ public class Checker {
         }
 
         static State start(int vertex) {
-            return new State(vertex, Treap.<Binding>empty(),
+        	
+            return new State(vertex, DisJointSet.emptySet(),
                     Queue.<Event>empty(), null, 0, ROOT_ID);
         }
 
-        static State make(int vertex, Treap<Binding> store, Queue<Event> events,
+        static State make(int vertex, DisJointSet store, Queue<Event> events,
                 Queue<Event> consumed, State parent) {
             return new State(vertex, store, events,
                     new Parent(parent, consumed), parent.time + 1, ++idPool);
@@ -726,18 +732,19 @@ public class Checker {
     }
 
     interface Guard {
-        boolean evaluate(Event event, Treap<Binding> store);
+        boolean evaluate(Event event, DisJointSet store);
     }
 
     static class AndGuard implements Guard {
-        final Guard[] children;
+
+		final Guard[] children;
 
         AndGuard(Guard[] children) {
             this.children = children;
         }
 
         @Override
-        public boolean evaluate(Event event, Treap<Binding> store) {
+        public boolean evaluate(Event event, DisJointSet store) {
             for (Guard g : children) {
                 if (!g.evaluate(event, store)) {
                     return false;
@@ -770,7 +777,7 @@ public class Checker {
         }
 
         @Override
-        public boolean evaluate(Event event, Treap<Binding> store) {
+        public boolean evaluate(Event event, DisJointSet store) {
             return !child.evaluate(event, store);
         }
 
@@ -790,7 +797,7 @@ public class Checker {
         }
 
         @Override
-        public boolean evaluate(Event event, Treap<Binding> store) {
+        public boolean evaluate(Event event, DisJointSet store) {
             Binding b = new Binding(storeIndex);
             boolean eq = valueEquals(event.values[eventIndex], store.get(b).value);
             if (logGuard) {
@@ -815,7 +822,7 @@ public class Checker {
         }
 
         @Override
-        public boolean evaluate(Event event, Treap<Binding> store) {
+        public boolean evaluate(Event event, DisJointSet store) {
             return (value == null)?
                 event.values[eventIndex] == null :
                 valueEquals(value, event.values[eventIndex]);
@@ -829,7 +836,7 @@ public class Checker {
 
     static class TrueGuard implements Guard {
         @Override
-        public boolean evaluate(Event event, Treap<Binding> store) {
+        public boolean evaluate(Event event, DisJointSet store) {
             return true;
         }
 
@@ -860,10 +867,9 @@ public class Checker {
             }
         }
 
-        Treap<Binding> apply(Event event, Treap<Binding> store) {
+        DisJointSet apply(Event event, DisJointSet store) {
             for (Map.Entry<Integer, Integer> e : assignments.entrySet()) {
-                Object value = event.values[e.getValue()];
-                store = store.insert(new Binding(e.getKey(), value));
+                store.insert(new Binding(e.getKey(), event.values[e.getValue()]));
             }
             return store;
         }
@@ -884,7 +890,7 @@ public class Checker {
             this.action = action;
         }
 
-        boolean evaluateGuard(Event event, Treap<Binding> store) {
+        boolean evaluateGuard(Event event, DisJointSet store) {
             return eventIds.contains(event.id)
                 && guard.evaluate(event, store);
         }
@@ -900,28 +906,28 @@ public class Checker {
     }
 
     static class Transition {
-        final TransitionStep[] steps;
-        final int target;
-
-        Transition(TransitionStep[] steps, int target) {
-            this.steps = steps;
-            this.target = target;
-        }
-
-        Transition(TransitionStep oneStep, int target) {
-            this(new TransitionStep[]{oneStep}, target);
-        }
-        
-        public String toString() {
-        	String s = "Transition:";
-        	int i = 1;
-        	for(TransitionStep ts : steps) {
-        		s += "\nStep " + i++ + ": " + ts;
-        	}
-        	s += "\nTransition Target: " + target;
-        	return s;
-        }
-    }
+	    final TransitionStep[] steps;
+	    final int target;
+	
+	    Transition(TransitionStep[] steps, int target) {
+	        this.steps = steps;
+	        this.target = target;
+	    }
+	
+	    Transition(TransitionStep oneStep, int target) {
+	        this(new TransitionStep[]{oneStep}, target);
+	    }
+	    
+	    public String toString() {
+	    	String s = "Transition:";
+	    	int i = 1;
+	    	for(TransitionStep ts : steps) {
+	    		s += "\nStep " + i++ + ": " + ts;
+	    	}
+	    	s += "\nTransition Target: " + target;
+	    	return s;
+	    }
+	}
 
     static class Automaton {
         private static class VertexEvent {
@@ -1082,6 +1088,33 @@ public class Checker {
 
     final private Automaton automaton;
     private HSet<State> states;
+    
+    public class Node implements Comparable<Node> {
+    	public final int nodeNum;
+    	public int skipNumber;
+    	public HashMap<Node, EdgeInformation> connectedNodes;
+    	
+    	public Node(int nodeNum) {
+    		this.nodeNum = nodeNum;
+    		this.skipNumber = 1;
+    		this.connectedNodes = new HashMap<Node, EdgeInformation>();
+    	}
+    	
+    	@Override
+    	public int compareTo(Node n) {
+    		if (this.nodeNum != n.nodeNum) return -1;
+    		return 0;
+    	}	
+    }
+        
+    public class EdgeInformation {
+    	public int occurances;
+    }
+    
+    private HashMap<Integer,Node> nodes;
+    private Node currentNode;
+    public static int skipsTotal;
+    public static int skipsLeft;
 
     public Checker(Automaton automaton) {
         this.automaton = automaton;
@@ -1089,6 +1122,10 @@ public class Checker {
         for (int v : automaton.startVertices) {
             states.add(State.start(v));
         }
+        this.nodes = new HashMap<Integer, Node>();
+        this.currentNode = new Node(-1); // We dont know where we start so lets use a dummy node
+        nodes.put(-1, currentNode);
+        skipsTotal = skipsLeft = 1;
     }
 
     private IdentityHashMap<Object, Integer> printingIds;
@@ -1244,6 +1281,11 @@ public class Checker {
                 return;
             }
             checkerEnabled = false;
+            if (logGraph) {
+            	Node n = nodes.getOrDefault(event.id, new Node(event.id));
+            	currentNode.connectedNodes.getOrDefault(n, new EdgeInformation()).occurances++;
+            	currentNode = n;
+            }
             if (onlyLogEvents) {
                 logEvent(event);
             } else {
@@ -1251,13 +1293,30 @@ public class Checker {
                     throwable.fillInStackTrace();
                     event.callStack = throwable.getStackTrace();
                 }
-                internalCheck(event);
+                // Simulating event skipping by ignoring events TODO jb886 implement actual event skipping
+                if(eventSkip && skipsLeft-- <= 0  ) {
+                	skipProcessing();
+                	internalCheck(event);
+                	calculateNextSkip();
+                } else if (!eventSkip) {
+                	internalCheck(event);
+                }
+            
             }
             checkerEnabled = true;
         } catch (Throwable t) {
             System.err.println("TOPL: INTERNAL ERROR");
             t.printStackTrace();
         }
+    }
+    
+    public void calculateNextSkip() {
+    	// TODO: jb886 we need a more intelligent skipNumber generation
+    	skipsTotal = skipsLeft = currentNode.skipNumber;
+    }
+    
+    public void skipProcessing() {
+    	
     }
 
     private static Queue<Event> noEvent = Queue.empty();
@@ -1301,7 +1360,7 @@ public class Checker {
                 assert steps.length <= 2;
                 assert steps.length <= events.size();
                 assert events.size() <= 2;
-                Treap<Binding> store = state.store;
+                DisJointSet store = state.store;
                 if (!steps[0].evaluateGuard(events.a, store)) {
                     continue;
                 }
@@ -1633,7 +1692,9 @@ public class Checker {
     private static boolean logAutomaton = true;
     private static boolean logGuard = false;
     private static boolean logState = true;
-    private static boolean logTreap = false;
+    //private static boolean logTreap = false;
+    private static boolean logGraph = true;
+    private static boolean eventSkip = true;
     // }}}
 }
 // vim:sts=4:sw=4:ts=8:et:

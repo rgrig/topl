@@ -10,7 +10,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Scanner;
 
-import topl.QuantifierElimination.DisJointSet;
+import src.topl.QuantifierElimination.DisJointSet;
 // }}}
 public class Checker {
     /*  Implementation Notes {{{
@@ -1317,6 +1317,50 @@ public class Checker {
     
     public void skipProcessing() {
     	
+    	int skipsToProcess = skipsTotal;
+    	HSet<State> statesToProcess = states;
+    	while (skipsToProcess > 0) {
+    		// Calculate Automaton Positions and Disjoint Sets
+    		HSet<State> activeStates = HSet.make(statesToProcess.size());
+    		for(State state : statesToProcess) {
+    			processState(state, activeStates);
+    		}
+    		
+    		HSet<State> eliminatedStates = HSet.make(statesToProcess.size());
+    		for(State state : activeStates) {
+    			int[] quantifiers = calculateElimination(state);
+    			for(int q : quantifiers) {
+    				quantifierElimination(state, q);
+    			}
+    		}
+    		
+    		
+        	// Calculate quantifiers to eliminate
+        	
+        	
+        	// Perform QuantifierElimination
+        	
+        	
+    		
+        	statesToProcess = activeStates;
+    		skipsToProcess--;
+    	}
+    	// Update current active states
+    	states = statesToProcess;	
+
+    	
+    }
+    
+    private void processState(State state, HSet<State> activeStates) {
+    	
+    }
+    
+    private HSet<State> quantifierElimination(State state, int elimination) {
+    	return null;
+    }
+    
+    private int[] calculateElimination(State state) {
+    	return null;
     }
 
     private static Queue<Event> noEvent = Queue.empty();

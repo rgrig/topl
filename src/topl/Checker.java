@@ -10,7 +10,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Scanner;
 
-import src.topl.QuantifierElimination.DisJointSet;
+import topl.QuantifierElimination.DisJointSet;
 // }}}
 public class Checker {
     /*  Implementation Notes {{{

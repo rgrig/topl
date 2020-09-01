@@ -16,3 +16,5 @@ javac.err.topl
 tests/*/err
 tests/*/out
 src/trash
+/toplc
+/test/*

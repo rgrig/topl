@@ -10,7 +10,7 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.Scanner;
 
-import topl.QuantifierElimination.DisJointSet;
+import topl.DisjointSet;
 // }}}
 public class Checker {
     /*  Implementation Notes {{{
@@ -664,7 +664,7 @@ public class Checker {
         // These contribute to the identity of a State.
         final int vertex;
         //final Treap<Binding> store;
-        final DisJointSet store;
+        final DisjointSet store;
         final Queue<Event> events;
 
         // History for trace reporting. Does not affect automaton semantics,
@@ -674,7 +674,7 @@ public class Checker {
         // How many non-skip transitions were taken to build this state.
         int time;
 
-        private State(int vertex, DisJointSet store, Queue<Event> events,
+        private State(int vertex, DisjointSet store, Queue<Event> events,
                 Parent parent, int time, long id) {
             this.vertex = vertex;
             this.store = store;
@@ -699,11 +699,11 @@ public class Checker {
 
         static State start(int vertex) {
         	
-            return new State(vertex, DisJointSet.emptySet(),
+            return new State(vertex, DisjointSet.emptySet(),
                     Queue.<Event>empty(), null, 0, ROOT_ID);
         }
 
-        static State make(int vertex, DisJointSet store, Queue<Event> events,
+        static State make(int vertex, DisjointSet store, Queue<Event> events,
                 Queue<Event> consumed, State parent) {
             return new State(vertex, store, events,
                     new Parent(parent, consumed), parent.time + 1, ++idPool);
@@ -732,7 +732,7 @@ public class Checker {
     }
 
     interface Guard {
-        boolean evaluate(Event event, DisJointSet store);
+        boolean evaluate(Event event, DisjointSet store);
     }
 
     static class AndGuard implements Guard {
@@ -744,7 +744,7 @@ public class Checker {
         }
 
         @Override
-        public boolean evaluate(Event event, DisJointSet store) {
+        public boolean evaluate(Event event, DisjointSet store) {
             for (Guard g : children) {
                 if (!g.evaluate(event, store)) {
                     return false;
@@ -777,7 +777,7 @@ public class Checker {
         }
 
         @Override
-        public boolean evaluate(Event event, DisJointSet store) {
+        public boolean evaluate(Event event, DisjointSet store) {
             return !child.evaluate(event, store);
         }
 
@@ -797,7 +797,7 @@ public class Checker {
         }
 
         @Override
-        public boolean evaluate(Event event, DisJointSet store) {
+        public boolean evaluate(Event event, DisjointSet store) {
             Binding b = new Binding(storeIndex);
             boolean eq = valueEquals(event.values[eventIndex], store.get(b).value);
             if (logGuard) {
@@ -822,7 +822,7 @@ public class Checker {
         }
 
         @Override
-        public boolean evaluate(Event event, DisJointSet store) {
+        public boolean evaluate(Event event, DisjointSet store) {
             return (value == null)?
                 event.values[eventIndex] == null :
                 valueEquals(value, event.values[eventIndex]);
@@ -836,7 +836,7 @@ public class Checker {
 
     static class TrueGuard implements Guard {
         @Override
-        public boolean evaluate(Event event, DisJointSet store) {
+        public boolean evaluate(Event event, DisjointSet store) {
             return true;
         }
 
@@ -867,7 +867,7 @@ public class Checker {
             }
         }
 
-        DisJointSet apply(Event event, DisJointSet store) {
+        DisjointSet apply(Event event, DisjointSet store) {
             for (Map.Entry<Integer, Integer> e : assignments.entrySet()) {
                 store.insert(new Binding(e.getKey(), event.values[e.getValue()]));
             }
@@ -890,7 +890,7 @@ public class Checker {
             this.action = action;
         }
 
-        boolean evaluateGuard(Event event, DisJointSet store) {
+        boolean evaluateGuard(Event event, DisjointSet store) {
             return eventIds.contains(event.id)
                 && guard.evaluate(event, store);
         }
@@ -1333,8 +1333,7 @@ public class Checker {
     				quantifierElimination(state, q);
     			}
     		}
-    		
-    		
+    		  		
         	// Calculate quantifiers to eliminate
         	
         	
@@ -1404,7 +1403,7 @@ public class Checker {
                 assert steps.length <= 2;
                 assert steps.length <= events.size();
                 assert events.size() <= 2;
-                DisJointSet store = state.store;
+                DisjointSet store = state.store;
                 if (!steps[0].evaluateGuard(events.a, store)) {
                     continue;
                 }
